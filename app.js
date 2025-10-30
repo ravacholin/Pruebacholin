@@ -5,6 +5,10 @@ class SubtitleEditor {
         this.subtitles = [];
         this.videoFile = null;
         this.selectedSubtitleId = null;
+        this.currentSelectedIndex = -1;
+        this.searchQuery = '';
+        this.filteredSubtitles = [];
+        this.autoScrollEnabled = true;
 
         // Elementos del DOM
         this.videoPlayer = document.getElementById('videoPlayer');
@@ -12,8 +16,13 @@ class SubtitleEditor {
         this.subtitleList = document.getElementById('subtitleList');
         this.currentTimeDisplay = document.getElementById('currentTime');
         this.durationDisplay = document.getElementById('duration');
+        this.subtitleCount = document.getElementById('subtitleCount');
+        this.searchInput = document.getElementById('searchInput');
+        this.clearSearchBtn = document.getElementById('clearSearch');
+        this.searchResults = document.getElementById('searchResults');
 
         this.initializeEventListeners();
+        this.initializeKeyboardShortcuts();
     }
 
     initializeEventListeners() {
@@ -77,6 +86,65 @@ class SubtitleEditor {
         document.getElementById('deleteSelected').addEventListener('click', () => {
             this.deleteSelectedSubtitle();
         });
+
+        // Búsqueda de subtítulos
+        this.searchInput.addEventListener('input', (e) => {
+            this.searchQuery = e.target.value;
+            this.filterSubtitles();
+        });
+
+        this.clearSearchBtn.addEventListener('click', () => {
+            this.clearSearch();
+        });
+    }
+
+    // Inicializar atajos de teclado
+    initializeKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // No activar shortcuts si se está editando un input/textarea
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                // Permitir Ctrl+F incluso en inputs
+                if (e.ctrlKey && e.key === 'f') {
+                    e.preventDefault();
+                    this.searchInput.focus();
+                }
+                // Permitir Escape para salir de inputs
+                if (e.key === 'Escape') {
+                    e.target.blur();
+                }
+                return;
+            }
+
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    this.navigatePrevious();
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    this.navigateNext();
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (this.currentSelectedIndex >= 0) {
+                        this.jumpToSubtitle(this.currentSelectedIndex);
+                    }
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    this.togglePlayPause();
+                    break;
+                case 'f':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        this.searchInput.focus();
+                    }
+                    break;
+                case 'Escape':
+                    this.clearSearch();
+                    break;
+            }
+        });
     }
 
     // Cargar video
@@ -128,6 +196,9 @@ class SubtitleEditor {
 
     // Renderizar lista de subtítulos
     renderSubtitles() {
+        // Actualizar contador
+        this.subtitleCount.textContent = this.subtitles.length;
+
         if (this.subtitles.length === 0) {
             this.subtitleList.innerHTML = `
                 <div class="empty-state">
@@ -144,6 +215,11 @@ class SubtitleEditor {
             const subtitleItem = this.createSubtitleItem(subtitle, index);
             this.subtitleList.appendChild(subtitleItem);
         });
+
+        // Aplicar filtro si existe una búsqueda activa
+        if (this.searchQuery) {
+            this.filterSubtitles();
+        }
     }
 
     // Crear elemento de subtítulo
@@ -202,7 +278,7 @@ class SubtitleEditor {
     }
 
     // Seleccionar un subtítulo
-    selectSubtitle(index) {
+    selectSubtitle(index, scrollToView = true) {
         // Remover selección anterior
         const previousSelected = this.subtitleList.querySelector('.subtitle-item.selected');
         if (previousSelected) {
@@ -214,10 +290,65 @@ class SubtitleEditor {
         if (item) {
             item.classList.add('selected');
             this.selectedSubtitleId = this.subtitles[index].id;
+            this.currentSelectedIndex = index;
 
             // Scroll al elemento seleccionado
-            item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            if (scrollToView) {
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
+    }
+
+    // Navegar al subtítulo anterior
+    navigatePrevious() {
+        if (this.subtitles.length === 0) return;
+
+        // Si hay búsqueda activa, navegar solo por subtítulos filtrados
+        const visibleIndices = this.getVisibleSubtitleIndices();
+        if (visibleIndices.length === 0) return;
+
+        const currentIndex = this.currentSelectedIndex;
+        const currentPosInVisible = visibleIndices.indexOf(currentIndex);
+
+        if (currentPosInVisible > 0) {
+            // Ir al anterior en la lista filtrada
+            this.selectSubtitle(visibleIndices[currentPosInVisible - 1]);
+        } else if (currentPosInVisible === 0) {
+            // Ya estamos en el primero, no hacer nada o ir al último
+            this.selectSubtitle(visibleIndices[visibleIndices.length - 1]);
+        } else {
+            // No hay selección, seleccionar el último
+            this.selectSubtitle(visibleIndices[visibleIndices.length - 1]);
+        }
+    }
+
+    // Navegar al siguiente subtítulo
+    navigateNext() {
+        if (this.subtitles.length === 0) return;
+
+        // Si hay búsqueda activa, navegar solo por subtítulos filtrados
+        const visibleIndices = this.getVisibleSubtitleIndices();
+        if (visibleIndices.length === 0) return;
+
+        const currentIndex = this.currentSelectedIndex;
+        const currentPosInVisible = visibleIndices.indexOf(currentIndex);
+
+        if (currentPosInVisible >= 0 && currentPosInVisible < visibleIndices.length - 1) {
+            // Ir al siguiente en la lista filtrada
+            this.selectSubtitle(visibleIndices[currentPosInVisible + 1]);
+        } else if (currentPosInVisible === visibleIndices.length - 1) {
+            // Ya estamos en el último, ir al primero
+            this.selectSubtitle(visibleIndices[0]);
+        } else {
+            // No hay selección, seleccionar el primero
+            this.selectSubtitle(visibleIndices[0]);
+        }
+    }
+
+    // Obtener índices de subtítulos visibles
+    getVisibleSubtitleIndices() {
+        const visibleItems = this.subtitleList.querySelectorAll('.subtitle-item:not(.hidden)');
+        return Array.from(visibleItems).map(item => parseInt(item.dataset.index));
     }
 
     // Saltar al subtítulo en el video
@@ -273,13 +404,27 @@ class SubtitleEditor {
     // Resaltar subtítulo activo en la lista
     highlightActiveSubtitle(id) {
         const items = this.subtitleList.querySelectorAll('.subtitle-item');
+        let activeItem = null;
+
         items.forEach(item => {
             if (parseInt(item.dataset.id) === id) {
                 item.classList.add('active');
+                activeItem = item;
             } else {
                 item.classList.remove('active');
             }
         });
+
+        // Auto-scroll al subtítulo activo si está habilitado
+        if (activeItem && this.autoScrollEnabled) {
+            // Solo hacer scroll si el elemento no está visible
+            const rect = activeItem.getBoundingClientRect();
+            const containerRect = this.subtitleList.getBoundingClientRect();
+
+            if (rect.top < containerRect.top || rect.bottom > containerRect.bottom) {
+                activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
     }
 
     // Actualizar tiempo actual
@@ -338,9 +483,74 @@ class SubtitleEditor {
         if (index !== -1) {
             this.subtitles.splice(index, 1);
             this.selectedSubtitleId = null;
+            this.currentSelectedIndex = -1;
             this.renderSubtitles();
             console.log('Subtítulo eliminado');
         }
+    }
+
+    // Filtrar subtítulos por búsqueda
+    filterSubtitles() {
+        const query = this.searchQuery.toLowerCase().trim();
+
+        if (!query) {
+            // Mostrar todos los subtítulos
+            const items = this.subtitleList.querySelectorAll('.subtitle-item');
+            items.forEach(item => {
+                item.classList.remove('hidden', 'search-match');
+                // Restaurar texto sin highlights
+                const textarea = item.querySelector('.subtitle-text');
+                const index = parseInt(item.dataset.index);
+                if (textarea && this.subtitles[index]) {
+                    textarea.value = this.subtitles[index].text;
+                }
+            });
+            this.clearSearchBtn.classList.remove('visible');
+            this.searchResults.textContent = '';
+            return;
+        }
+
+        this.clearSearchBtn.classList.add('visible');
+
+        let matchCount = 0;
+        const items = this.subtitleList.querySelectorAll('.subtitle-item');
+
+        items.forEach(item => {
+            const index = parseInt(item.dataset.index);
+            const subtitle = this.subtitles[index];
+            const text = subtitle.text.toLowerCase();
+
+            if (text.includes(query)) {
+                // Mostrar y marcar como coincidencia
+                item.classList.remove('hidden');
+                item.classList.add('search-match');
+                matchCount++;
+
+                // Highlight del texto coincidente en el textarea
+                const textarea = item.querySelector('.subtitle-text');
+                if (textarea) {
+                    // Para textareas no podemos usar HTML, así que solo restauramos el texto
+                    textarea.value = subtitle.text;
+                }
+            } else {
+                // Ocultar
+                item.classList.add('hidden');
+                item.classList.remove('search-match');
+            }
+        });
+
+        // Mostrar resultados
+        this.searchResults.textContent = matchCount > 0
+            ? `${matchCount} resultado${matchCount !== 1 ? 's' : ''} encontrado${matchCount !== 1 ? 's' : ''}`
+            : 'No se encontraron resultados';
+    }
+
+    // Limpiar búsqueda
+    clearSearch() {
+        this.searchInput.value = '';
+        this.searchQuery = '';
+        this.filterSubtitles();
+        this.searchInput.blur();
     }
 }
 
