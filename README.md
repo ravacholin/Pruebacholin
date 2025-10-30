@@ -12,6 +12,7 @@ Editor web profesional para archivos de subtítulos SRT con reproductor de video
 - **Controles de reproducción**: Play/pause, saltos de 5 segundos, velocidad de reproducción ajustable
 - **Agregar/eliminar subtítulos**: Crea nuevos subtítulos o elimina los existentes
 - **Exportar**: Guarda tus cambios en un nuevo archivo SRT
+- **Historial de cambios**: Deshaz y rehace acciones con botones dedicados o atajos de teclado
 
 ## Cómo usar
 
@@ -32,6 +33,7 @@ Editor web profesional para archivos de subtítulos SRT con reproductor de video
    - **Editar tiempos**: Click en los campos de tiempo y modifica (formato: HH:MM:SS,mmm)
    - **Saltar al video**: Click en cualquier parte del subtítulo (excepto inputs) para saltar a ese momento
    - **Ver en vivo**: Los subtítulos activos se resaltan con borde verde y se muestran sobre el video
+   - **Deshacer/rehacer**: Usa los botones ↺/↻ o los atajos `Ctrl+Z` / `Ctrl+Y`
 
 5. **Agregar/eliminar**:
    - **Nuevo subtítulo**: Click en "+ Nuevo" (se crea en el tiempo actual del video)
@@ -47,6 +49,15 @@ Editor web profesional para archivos de subtítulos SRT con reproductor de video
 - **⏪ -5s**: Retroceder 5 segundos
 - **⏩ +5s**: Avanzar 5 segundos
 - **Velocidad**: Ajustar velocidad de reproducción (0.25x a 2x)
+
+## Atajos de teclado
+
+- **Ctrl+Z / Cmd+Z**: Deshacer última acción en el editor
+- **Ctrl+Y / Shift+Cmd+Z**: Rehacer la última acción deshecha
+- **Ctrl+F / Cmd+F**: Ir al campo de búsqueda
+- **↑ / ↓**: Navegar entre subtítulos
+- **Enter**: Saltar al tiempo del subtítulo seleccionado
+- **Espacio**: Reproducir o pausar el video
 
 ## Formato SRT
 
