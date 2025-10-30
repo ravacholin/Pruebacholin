@@ -8,16 +8,140 @@
 </head>
 <body>
     <div class="container">
+        <!-- Toast Container -->
+        <div id="toastContainer" class="toast-container"></div>
+
+        <!-- Recovery Modal -->
+        <div id="recoveryModal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Sesión no guardada detectada</h2>
+                <p>Encontramos una sesión de edición anterior que no fue guardada.</p>
+                <p class="modal-info">
+                    <strong id="recoverySubtitleCount">0</strong> subtítulos •
+                    Última edición: <strong id="recoveryTimestamp">-</strong>
+                </p>
+                <div class="modal-actions">
+                    <button id="recoverSession" class="btn btn-success">✓ Recuperar sesión</button>
+                    <button id="discardSession" class="btn btn-danger">✕ Descartar y empezar de nuevo</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sync Timing Modal -->
+        <div id="syncModal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <h2>⏱ Ajustar Sincronización</h2>
+                <p>Aplica correcciones de tiempo a tus subtítulos de forma masiva.</p>
+
+                <div class="sync-tabs">
+                    <button class="sync-tab active" data-tab="shift">Desplazar Tiempo</button>
+                    <button class="sync-tab" data-tab="scale">Ajustar Velocidad</button>
+                    <button class="sync-tab" data-tab="from-mark">Desde Marca</button>
+                </div>
+
+                <!-- Shift Tab -->
+                <div class="sync-tab-content active" id="shiftTab">
+                    <div class="form-group">
+                        <label>Desplazar todos los subtítulos:</label>
+                        <div class="input-with-unit">
+                            <input type="number" id="shiftAmount" step="0.1" value="0" class="form-input">
+                            <select id="shiftUnit" class="form-select">
+                                <option value="seconds">segundos</option>
+                                <option value="milliseconds">milisegundos</option>
+                            </select>
+                        </div>
+                        <p class="form-help">Usa valores negativos para adelantar, positivos para retrasar</p>
+                    </div>
+                </div>
+
+                <!-- Scale Tab -->
+                <div class="sync-tab-content" id="scaleTab">
+                    <div class="form-group">
+                        <label>Ajustar velocidad:</label>
+                        <div class="input-with-unit">
+                            <input type="number" id="scalePercent" step="0.1" value="100" min="50" max="200" class="form-input">
+                            <span class="input-unit">%</span>
+                        </div>
+                        <p class="form-help">100% = sin cambios, >100% = más lento, <100% = más rápido</p>
+                    </div>
+                </div>
+
+                <!-- From Mark Tab -->
+                <div class="sync-tab-content" id="fromMarkTab">
+                    <div class="form-group">
+                        <label>Subtítulo de referencia:</label>
+                        <select id="referenceSubtitle" class="form-select">
+                            <option value="">Selecciona un subtítulo...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Nuevo tiempo de inicio:</label>
+                        <input type="text" id="newStartTime" placeholder="00:00:00,000" class="form-input">
+                        <p class="form-help">Los demás subtítulos se ajustarán proporcionalmente</p>
+                    </div>
+                </div>
+
+                <!-- Range Selection -->
+                <div class="form-group range-selector">
+                    <label>
+                        <input type="checkbox" id="applyToRange">
+                        Aplicar solo a un rango de subtítulos
+                    </label>
+                    <div id="rangeInputs" class="range-inputs hidden">
+                        <div class="range-input-group">
+                            <label>Desde:</label>
+                            <input type="number" id="rangeFrom" min="1" value="1" class="form-input-small">
+                        </div>
+                        <div class="range-input-group">
+                            <label>Hasta:</label>
+                            <input type="number" id="rangeTo" min="1" value="1" class="form-input-small">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="sync-preview">
+                    <h3>Vista previa</h3>
+                    <div id="syncPreview" class="preview-content">
+                        Configura los ajustes para ver una vista previa...
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="applySyncButton" class="btn btn-success">✓ Aplicar cambios</button>
+                    <button id="cancelSync" class="btn">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
         <header>
             <h1>Editor de Subtítulos SRT</h1>
             <div class="header-controls">
                 <button id="loadVideo" class="btn btn-primary">Cargar Video</button>
                 <button id="loadSRT" class="btn btn-primary">Cargar SRT</button>
                 <button id="saveSRT" class="btn btn-success">Guardar SRT</button>
+                <button id="saveSession" class="btn" title="Guardar sesión manualmente">💾 Guardar sesión</button>
+                <div id="autoSaveIndicator" class="autosave-indicator">
+                    <span class="autosave-icon">💾</span>
+                    <span id="autoSaveStatus">Auto-guardado activo</span>
+                </div>
             </div>
         </header>
 
         <div class="main-content">
+            <!-- View Mode Controls -->
+            <div class="view-mode-controls">
+                <button id="theaterMode" class="btn-view-mode" title="Modo Teatro (Ocultar editor)">
+                    🎭
+                </button>
+                <button id="focusMode" class="btn-view-mode" title="Modo Enfoque (Minimizar video)">
+                    📝
+                </button>
+                <button id="normalMode" class="btn-view-mode active" title="Modo Normal">
+                    ⊞
+                </button>
+            </div>
+
             <!-- Video Player Section -->
             <div class="video-section">
                 <div class="video-container">
@@ -51,6 +175,9 @@
                 </div>
             </div>
 
+            <!-- Resizer Handle -->
+            <div id="resizer" class="resizer"></div>
+
             <!-- Subtitle Editor Section -->
             <div class="editor-section">
                 <div class="editor-header">
@@ -58,8 +185,46 @@
                     <div class="editor-actions">
                         <button id="undoAction" class="btn btn-small" title="Ctrl+Z">↺ Deshacer</button>
                         <button id="redoAction" class="btn btn-small" title="Ctrl+Y">↻ Rehacer</button>
+                        <button id="syncTiming" class="btn btn-small btn-primary" title="Ajustar sincronización">⏱ Sincronizar</button>
                         <button id="addSubtitle" class="btn btn-small">+ Nuevo</button>
                         <button id="deleteSelected" class="btn btn-small btn-danger">🗑 Eliminar</button>
+                    </div>
+                </div>
+
+                <!-- Context View -->
+                <div class="context-view" id="contextView">
+                    <div class="context-header">
+                        <button id="contextPrev" class="btn-context">← Anterior</button>
+                        <span id="contextPosition" class="context-position">-/-</span>
+                        <button id="contextNext" class="btn-context">Siguiente →</button>
+                    </div>
+
+                    <div class="context-subtitles">
+                        <!-- Previous Subtitle -->
+                        <div class="context-subtitle previous">
+                            <div class="context-label">Anterior</div>
+                            <div class="context-time" id="contextPrevTime">--:--:--,---</div>
+                            <div class="context-text" id="contextPrevText">-</div>
+                            <div class="context-gap" id="contextPrevGap"></div>
+                        </div>
+
+                        <!-- Current Subtitle (Editable) -->
+                        <div class="context-subtitle current">
+                            <div class="context-label">Actual (Editando)</div>
+                            <div class="context-timeline" id="contextTimeline"></div>
+                            <div class="context-time" id="contextCurrentTime">--:--:--,---</div>
+                            <div class="context-text editable" contenteditable="false" id="contextCurrentText">
+                                Selecciona un subtítulo para ver el contexto
+                            </div>
+                            <div class="context-gap" id="contextCurrentGap"></div>
+                        </div>
+
+                        <!-- Next Subtitle -->
+                        <div class="context-subtitle next">
+                            <div class="context-label">Siguiente</div>
+                            <div class="context-time" id="contextNextTime">--:--:--,---</div>
+                            <div class="context-text" id="contextNextText">-</div>
+                        </div>
                     </div>
                 </div>
 
@@ -74,6 +239,29 @@
                     >
                     <button id="clearSearch" class="btn-clear" title="Limpiar búsqueda">✕</button>
                     <div id="searchResults" class="search-results"></div>
+                </div>
+
+                <!-- Quality Panel -->
+                <div class="quality-panel collapsed">
+                    <div class="quality-header" id="qualityToggle">
+                        <h3>
+                            <span class="quality-icon">✓</span>
+                            Asistente de Calidad
+                            <span id="qualityBadge" class="quality-badge">0</span>
+                        </h3>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="quality-content">
+                        <div id="qualityChecklist" class="quality-checklist">
+                            <div class="quality-item loading">
+                                <span class="quality-status">⏳</span>
+                                <span>Analizando subtítulos...</span>
+                            </div>
+                        </div>
+                        <button id="exportQualityReport" class="btn btn-small" style="width: 100%; margin-top: 0.5rem;">
+                            📄 Exportar Reporte
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Navigation Info -->
