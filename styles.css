@@ -195,6 +195,90 @@ header h1 {
     align-items: center;
 }
 
+.timing-panel {
+    padding: 1rem;
+    background: #252525;
+    border-bottom: 1px solid #3d3d3d;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.timing-panel h3 {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.timing-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.timing-form label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #d1d5db;
+}
+
+.timing-form-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.timing-form-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid #505050;
+    background: #2d2d2d;
+    color: #ffffff;
+}
+
+.timing-form-row input:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
+.timing-helper {
+    font-size: 0.75rem;
+    color: #909090;
+}
+
+.timing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.timing-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.timing-field-label {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.timing-field input {
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #505050;
+    background: #2d2d2d;
+    color: #ffffff;
+}
+
+.timing-field input:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
 .editor-header h2 {
     font-size: 1.2rem;
     font-weight: 600;
@@ -457,6 +541,10 @@ header h1 {
     .editor-section {
         width: 100%;
         height: 50%;
+    }
+
+    .timing-grid {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
     }
 
     header {
