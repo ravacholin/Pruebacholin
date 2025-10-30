@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Subtítulos SRT</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Editor de Subtítulos SRT</h1>
+            <div class="header-controls">
+                <button id="loadVideo" class="btn btn-primary">Cargar Video</button>
+                <button id="loadSRT" class="btn btn-primary">Cargar SRT</button>
+                <button id="saveSRT" class="btn btn-success">Guardar SRT</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Video Player Section -->
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoPlayer" controls>
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                    <div id="subtitleOverlay" class="subtitle-overlay"></div>
+                </div>
+
+                <div class="video-controls">
+                    <div class="time-display">
+                        <span id="currentTime">00:00:00,000</span> / <span id="duration">00:00:00,000</span>
+                    </div>
+                    <div class="playback-controls">
+                        <button id="playPause" class="btn">▶ Play</button>
+                        <button id="skipBack" class="btn">⏪ -5s</button>
+                        <button id="skipForward" class="btn">⏩ +5s</button>
+                        <label>
+                            Velocidad:
+                            <select id="playbackRate">
+                                <option value="0.25">0.25x</option>
+                                <option value="0.5">0.5x</option>
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>1x</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subtitle Editor Section -->
+            <div class="editor-section">
+                <div class="editor-header">
+                    <h2>Subtítulos</h2>
+                    <div class="editor-actions">
+                        <button id="addSubtitle" class="btn btn-small">+ Nuevo</button>
+                        <button id="deleteSelected" class="btn btn-small btn-danger">🗑 Eliminar</button>
+                    </div>
+                </div>
+
+                <div id="subtitleList" class="subtitle-list">
+                    <div class="empty-state">
+                        <p>No hay subtítulos cargados</p>
+                        <p>Carga un archivo SRT para comenzar</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="videoInput" accept="video/*" style="display: none;">
+    <input type="file" id="srtInput" accept=".srt" style="display: none;">
+
+    <script src="srt-parser.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
