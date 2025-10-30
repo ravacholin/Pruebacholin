@@ -114,6 +114,328 @@
             </div>
         </div>
 
+        <!-- Find and Replace Modal -->
+        <div id="findReplaceModal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <h2>🔍 Buscar y Reemplazar</h2>
+
+                <div class="sync-tabs">
+                    <button class="sync-tab active" data-tab="simple">Simple</button>
+                    <button class="sync-tab" data-tab="regex">Regex</button>
+                    <button class="sync-tab" data-tab="advanced">Avanzado</button>
+                </div>
+
+                <!-- Simple Tab -->
+                <div class="sync-tab-content active" id="simpleTab">
+                    <div class="form-group">
+                        <label>Buscar:</label>
+                        <input type="text" id="findText" class="form-input" placeholder="Texto a buscar...">
+                    </div>
+                    <div class="form-group">
+                        <label>Reemplazar por:</label>
+                        <input type="text" id="replaceText" class="form-input" placeholder="Texto de reemplazo...">
+                    </div>
+                </div>
+
+                <!-- Regex Tab -->
+                <div class="sync-tab-content" id="regexTab">
+                    <div class="form-group">
+                        <label>Patrón Regex:</label>
+                        <input type="text" id="regexPattern" class="form-input" placeholder="ej: \b[A-Z]{2,}\b">
+                        <p class="form-help">Usa expresiones regulares JavaScript. <a href="https://regex101.com" target="_blank">regex101.com</a> para probar</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Reemplazar por:</label>
+                        <input type="text" id="regexReplace" class="form-input" placeholder="Puedes usar $1, $2, etc.">
+                    </div>
+                </div>
+
+                <!-- Advanced Tab -->
+                <div class="sync-tab-content" id="advancedTab">
+                    <div class="form-group">
+                        <label>Buscar:</label>
+                        <input type="text" id="advancedFindText" class="form-input" placeholder="Texto a buscar...">
+                    </div>
+                    <div class="form-group">
+                        <label>Filtros adicionales:</label>
+                        <div class="filter-options">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="filterByDuration">
+                                Duración entre
+                                <input type="number" id="minDuration" class="form-input-small" value="0" step="0.1"> y
+                                <input type="number" id="maxDuration" class="form-input-small" value="10" step="0.1"> segundos
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="filterByLength">
+                                Longitud entre
+                                <input type="number" id="minLength" class="form-input-small" value="0"> y
+                                <input type="number" id="maxLength" class="form-input-small" value="100"> caracteres
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options (for all tabs) -->
+                <div class="form-group options-section">
+                    <label>Opciones:</label>
+                    <div class="checkbox-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="caseSensitive">
+                            Distinguir mayúsculas/minúsculas
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="wholeWord">
+                            Palabra completa
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Results Preview -->
+                <div class="find-replace-results" id="findReplaceResults">
+                    <div class="results-header">
+                        <h3>Resultados <span id="matchCount" class="match-count">0 coincidencias</span></h3>
+                        <div class="results-actions">
+                            <button id="selectAllMatches" class="btn btn-small">Seleccionar todo</button>
+                            <button id="deselectAllMatches" class="btn btn-small">Deseleccionar todo</button>
+                        </div>
+                    </div>
+                    <div id="matchList" class="match-list">
+                        <p class="no-results">Introduce un término de búsqueda para ver resultados...</p>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="applyReplace" class="btn btn-success" disabled>✓ Aplicar reemplazos</button>
+                    <button id="cancelFindReplace" class="btn">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Split Subtitle Modal -->
+        <div id="splitModal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <h2>✂️ Dividir Subtítulo</h2>
+                <p>Divide el subtítulo en dos partes. Coloca el cursor donde desees dividir.</p>
+
+                <div class="split-preview">
+                    <div class="subtitle-preview">
+                        <h4>Subtítulo Original:</h4>
+                        <div class="preview-box">
+                            <div class="preview-time" id="splitOriginalTime">00:00:00,000 → 00:00:02,000</div>
+                            <div class="preview-text" id="splitOriginalText">Texto del subtítulo original...</div>
+                        </div>
+                    </div>
+
+                    <div class="split-input-container">
+                        <h4>Divide aquí:</h4>
+                        <textarea id="splitTextarea" class="split-textarea" rows="3"></textarea>
+                        <div class="split-cursor-info">
+                            <span>Posición del cursor: <strong id="cursorPosition">0</strong></span>
+                            <button id="splitAtCursor" class="btn btn-small btn-primary">Dividir en cursor</button>
+                        </div>
+                    </div>
+
+                    <div class="split-result">
+                        <h4>Resultado:</h4>
+                        <div class="result-subtitles">
+                            <div class="result-subtitle first">
+                                <div class="result-label">Subtítulo 1</div>
+                                <div class="result-time" id="result1Time">00:00:00,000 → 00:00:01,000</div>
+                                <div class="result-text" id="result1Text">Primera parte...</div>
+                            </div>
+                            <div class="result-subtitle second">
+                                <div class="result-label">Subtítulo 2</div>
+                                <div class="result-time" id="result2Time">00:00:01,000 → 00:00:02,000</div>
+                                <div class="result-text" id="result2Text">Segunda parte...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="applySplit" class="btn btn-success">✓ Aplicar división</button>
+                    <button id="cancelSplit" class="btn">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyboard Shortcuts Cheat Sheet Modal -->
+        <div id="cheatSheetModal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <h2>⌨️ Atajos de Teclado</h2>
+                <p>Presiona <kbd>?</kbd> o <kbd>F1</kbd> para mostrar/ocultar esta ayuda</p>
+
+                <div class="shortcuts-container">
+                    <div class="shortcuts-section">
+                        <h3>Navegación</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>↑</kbd></span>
+                            <span class="shortcut-description">Subtítulo anterior</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>↓</kbd></span>
+                            <span class="shortcut-description">Subtítulo siguiente</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Enter</kbd></span>
+                            <span class="shortcut-description">Ir a subtítulo seleccionado</span>
+                        </div>
+                    </div>
+
+                    <div class="shortcuts-section">
+                        <h3>Reproducción</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Space</kbd></span>
+                            <span class="shortcut-description">Reproducir/Pausar</span>
+                        </div>
+                    </div>
+
+                    <div class="shortcuts-section">
+                        <h3>Edición</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></span>
+                            <span class="shortcut-description">Deshacer</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Y</kbd></span>
+                            <span class="shortcut-description">Rehacer</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></span>
+                            <span class="shortcut-description">Dividir subtítulo</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd></span>
+                            <span class="shortcut-description">Fusionar subtítulos</span>
+                        </div>
+                    </div>
+
+                    <div class="shortcuts-section">
+                        <h3>Búsqueda</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>F</kbd></span>
+                            <span class="shortcut-description">Buscar</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>H</kbd></span>
+                            <span class="shortcut-description">Buscar y reemplazar</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Esc</kbd></span>
+                            <span class="shortcut-description">Limpiar búsqueda</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="openShortcutConfig" class="btn btn-primary">⚙️ Configurar atajos</button>
+                    <button id="closeCheatSheet" class="btn">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyboard Shortcuts Configuration Modal -->
+        <div id="shortcutConfigModal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <h2>⚙️ Configurar Atajos de Teclado</h2>
+
+                <div class="config-header">
+                    <div class="profile-selector">
+                        <label>Perfil predefinido:</label>
+                        <select id="shortcutProfile" class="form-select">
+                            <option value="default">Predeterminado</option>
+                            <option value="premiere">Premiere Pro</option>
+                            <option value="aegisub">Aegisub</option>
+                            <option value="vim">Vim-like</option>
+                        </select>
+                    </div>
+                    <button id="resetShortcuts" class="btn btn-small">↺ Restaurar</button>
+                </div>
+
+                <div id="shortcutConflictWarning" class="conflict-warning hidden">
+                    ⚠️ Hay conflictos en los atajos de teclado. Por favor, resuelve los conflictos antes de guardar.
+                </div>
+
+                <div class="shortcuts-config-container">
+                    <div class="config-section">
+                        <h3>Navegación</h3>
+                        <div class="config-item">
+                            <label>Subtítulo anterior</label>
+                            <input type="text" class="shortcut-input" data-action="navigatePrevious" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                        <div class="config-item">
+                            <label>Subtítulo siguiente</label>
+                            <input type="text" class="shortcut-input" data-action="navigateNext" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                        <div class="config-item">
+                            <label>Ir a subtítulo</label>
+                            <input type="text" class="shortcut-input" data-action="jumpToSubtitle" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>Reproducción</h3>
+                        <div class="config-item">
+                            <label>Reproducir/Pausar</label>
+                            <input type="text" class="shortcut-input" data-action="togglePlayPause" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>Edición</h3>
+                        <div class="config-item">
+                            <label>Deshacer</label>
+                            <input type="text" class="shortcut-input" data-action="undo" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                        <div class="config-item">
+                            <label>Rehacer</label>
+                            <input type="text" class="shortcut-input" data-action="redo" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                        <div class="config-item">
+                            <label>Dividir subtítulo</label>
+                            <input type="text" class="shortcut-input" data-action="splitSubtitle" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                        <div class="config-item">
+                            <label>Fusionar subtítulos</label>
+                            <input type="text" class="shortcut-input" data-action="mergeSubtitles" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>Búsqueda</h3>
+                        <div class="config-item">
+                            <label>Buscar</label>
+                            <input type="text" class="shortcut-input" data-action="focusSearch" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                        <div class="config-item">
+                            <label>Buscar y reemplazar</label>
+                            <input type="text" class="shortcut-input" data-action="findReplace" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                        <div class="config-item">
+                            <label>Limpiar búsqueda</label>
+                            <input type="text" class="shortcut-input" data-action="clearSearch" readonly placeholder="Presiona teclas...">
+                            <button class="btn-clear-shortcut">✕</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="saveShortcuts" class="btn btn-success">✓ Guardar</button>
+                    <button id="cancelShortcutConfig" class="btn">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
         <header>
             <h1>Editor de Subtítulos SRT</h1>
             <div class="header-controls">
@@ -185,9 +507,13 @@
                     <div class="editor-actions">
                         <button id="undoAction" class="btn btn-small" title="Ctrl+Z">↺ Deshacer</button>
                         <button id="redoAction" class="btn btn-small" title="Ctrl+Y">↻ Rehacer</button>
+                        <button id="openFindReplace" class="btn btn-small btn-primary" title="Ctrl+H">🔍 Buscar y Reemplazar</button>
                         <button id="syncTiming" class="btn btn-small btn-primary" title="Ajustar sincronización">⏱ Sincronizar</button>
+                        <button id="splitSubtitle" class="btn btn-small" title="Ctrl+Shift+D">✂️ Dividir</button>
+                        <button id="mergeSubtitles" class="btn btn-small" title="Ctrl+Shift+M">🔗 Fusionar</button>
                         <button id="addSubtitle" class="btn btn-small">+ Nuevo</button>
                         <button id="deleteSelected" class="btn btn-small btn-danger">🗑 Eliminar</button>
+                        <button id="openCheatSheet" class="btn btn-small" title="? o F1">⌨️ Atajos</button>
                     </div>
                 </div>
 

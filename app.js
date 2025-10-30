@@ -25,6 +25,11 @@ class SubtitleEditor {
         this.isResizing = false;
         this.editorWidth = this.loadEditorWidth() || 450;
 
+        // Keyboard shortcuts manager
+        this.shortcuts = this.loadShortcuts();
+        this.shortcutProfiles = this.getShortcutProfiles();
+        this.capturingShortcutFor = null;
+
         // Elementos del DOM
         this.videoPlayer = document.getElementById('videoPlayer');
         this.subtitleOverlay = document.getElementById('subtitleOverlay');
@@ -158,10 +163,18 @@ class SubtitleEditor {
         });
 
         // Tabs de sincronización
-        const syncTabs = document.querySelectorAll('.sync-tab');
+        const syncTabs = document.querySelectorAll('#syncModal .sync-tab');
         syncTabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
                 this.switchSyncTab(e.target.dataset.tab);
+            });
+        });
+
+        // Tabs de búsqueda y reemplazo
+        const findReplaceTabs = document.querySelectorAll('#findReplaceModal .sync-tab');
+        findReplaceTabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                this.switchFindReplaceTab(e.target.dataset.tab);
             });
         });
 
@@ -198,6 +211,40 @@ class SubtitleEditor {
             this.exportQualityReport();
         });
 
+        // Búsqueda y Reemplazo
+        document.getElementById('openFindReplace').addEventListener('click', () => {
+            this.openFindReplaceModal();
+        });
+
+        document.getElementById('cancelFindReplace').addEventListener('click', () => {
+            this.closeFindReplaceModal();
+        });
+
+        document.getElementById('applyReplace').addEventListener('click', () => {
+            this.applyReplacements();
+        });
+
+        document.getElementById('selectAllMatches').addEventListener('click', () => {
+            this.selectAllMatches(true);
+        });
+
+        document.getElementById('deselectAllMatches').addEventListener('click', () => {
+            this.selectAllMatches(false);
+        });
+
+        // Event listeners para búsqueda en tiempo real
+        ['findText', 'replaceText', 'regexPattern', 'regexReplace', 'advancedFindText',
+         'caseSensitive', 'wholeWord', 'filterByDuration', 'filterByLength',
+         'minDuration', 'maxDuration', 'minLength', 'maxLength'].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                const eventType = element.type === 'checkbox' ? 'change' : 'input';
+                element.addEventListener(eventType, () => {
+                    this.performFindReplace();
+                });
+            }
+        });
+
         // Modos de vista
         document.getElementById('theaterMode').addEventListener('click', () => {
             this.setViewMode('theater');
@@ -214,6 +261,60 @@ class SubtitleEditor {
         // Resizer
         this.initializeResizer();
         this.applyEditorWidth();
+
+        // División y Fusión
+        document.getElementById('splitSubtitle').addEventListener('click', () => {
+            this.openSplitModal();
+        });
+
+        document.getElementById('mergeSubtitles').addEventListener('click', () => {
+            this.mergeSelectedSubtitles();
+        });
+
+        document.getElementById('cancelSplit').addEventListener('click', () => {
+            this.closeSplitModal();
+        });
+
+        document.getElementById('applySplit').addEventListener('click', () => {
+            this.applySplitSubtitle();
+        });
+
+        document.getElementById('splitAtCursor').addEventListener('click', () => {
+            this.updateSplitPreview();
+        });
+
+        // Keyboard Shortcuts
+        document.getElementById('openCheatSheet').addEventListener('click', () => {
+            this.openCheatSheet();
+        });
+
+        document.getElementById('closeCheatSheet').addEventListener('click', () => {
+            this.closeCheatSheet();
+        });
+
+        document.getElementById('openShortcutConfig').addEventListener('click', () => {
+            this.closeCheatSheet();
+            this.openShortcutConfig();
+        });
+
+        document.getElementById('cancelShortcutConfig').addEventListener('click', () => {
+            this.closeShortcutConfig();
+        });
+
+        document.getElementById('saveShortcuts').addEventListener('click', () => {
+            this.saveShortcutsConfig();
+        });
+
+        document.getElementById('resetShortcuts').addEventListener('click', () => {
+            this.resetShortcutsToDefault();
+        });
+
+        document.getElementById('shortcutProfile').addEventListener('change', (e) => {
+            this.applyShortcutProfile(e.target.value);
+        });
+
+        // Initialize shortcut input listeners
+        this.initializeShortcutInputs();
 
         // Vista de contexto
         document.getElementById('contextPrev').addEventListener('click', () => {
@@ -234,27 +335,76 @@ class SubtitleEditor {
     // Inicializar atajos de teclado
     initializeKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
+            // If capturing shortcut, handle it
+            if (this.capturingShortcutFor) {
+                e.preventDefault();
+                this.captureShortcut(e);
+                return;
+            }
+
             const isModifier = e.ctrlKey || e.metaKey;
             const key = e.key.toLowerCase();
 
-            if (isModifier && key === 'z' && !e.shiftKey) {
+            // Cheat sheet toggle (? or F1)
+            if ((key === '?' && !isModifier && !e.shiftKey) || e.key === 'F1') {
+                e.preventDefault();
+                this.toggleCheatSheet();
+                return;
+            }
+
+            // Check if a modal is open - close it with Escape
+            if (e.key === 'Escape') {
+                const cheatSheetModal = document.getElementById('cheatSheetModal');
+                const configModal = document.getElementById('shortcutConfigModal');
+                if (!cheatSheetModal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    this.closeCheatSheet();
+                    return;
+                }
+                if (!configModal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    this.closeShortcutConfig();
+                    return;
+                }
+            }
+
+            // Check if we should use configurable shortcuts
+            if (this.matchShortcut(e, 'undo')) {
                 e.preventDefault();
                 this.undo();
                 return;
             }
 
-            if ((isModifier && key === 'y') || ((e.metaKey || e.ctrlKey) && e.shiftKey && key === 'z')) {
+            if (this.matchShortcut(e, 'redo')) {
                 e.preventDefault();
                 this.redo();
                 return;
             }
 
+            if (this.matchShortcut(e, 'splitSubtitle')) {
+                e.preventDefault();
+                this.openSplitModal();
+                return;
+            }
+
+            if (this.matchShortcut(e, 'mergeSubtitles')) {
+                e.preventDefault();
+                this.mergeSelectedSubtitles();
+                return;
+            }
+
             // No activar shortcuts si se está editando un input/textarea
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                // Permitir Ctrl+F incluso en inputs
-                if (isModifier && key === 'f') {
+                // Permitir shortcuts específicos en inputs
+                if (this.matchShortcut(e, 'focusSearch')) {
                     e.preventDefault();
                     this.searchInput.focus();
+                    return;
+                }
+                if (this.matchShortcut(e, 'findReplace')) {
+                    e.preventDefault();
+                    this.openFindReplaceModal();
+                    return;
                 }
                 // Permitir Escape para salir de inputs
                 if (e.key === 'Escape') {
@@ -263,34 +413,49 @@ class SubtitleEditor {
                 return;
             }
 
-            switch(e.key) {
-                case 'ArrowUp':
-                    e.preventDefault();
-                    this.navigatePrevious();
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    this.navigateNext();
-                    break;
-                case 'Enter':
-                    e.preventDefault();
-                    if (this.currentSelectedIndex >= 0) {
-                        this.jumpToSubtitle(this.currentSelectedIndex);
-                    }
-                    break;
-                case ' ':
-                    e.preventDefault();
-                    this.togglePlayPause();
-                    break;
-                case 'f':
-                    if (e.ctrlKey) {
-                        e.preventDefault();
-                        this.searchInput.focus();
-                    }
-                    break;
-                case 'Escape':
-                    this.clearSearch();
-                    break;
+            // Navigation and other shortcuts
+            if (this.matchShortcut(e, 'navigatePrevious')) {
+                e.preventDefault();
+                this.navigatePrevious();
+                return;
+            }
+
+            if (this.matchShortcut(e, 'navigateNext')) {
+                e.preventDefault();
+                this.navigateNext();
+                return;
+            }
+
+            if (this.matchShortcut(e, 'jumpToSubtitle')) {
+                e.preventDefault();
+                if (this.currentSelectedIndex >= 0) {
+                    this.jumpToSubtitle(this.currentSelectedIndex);
+                }
+                return;
+            }
+
+            if (this.matchShortcut(e, 'togglePlayPause')) {
+                e.preventDefault();
+                this.togglePlayPause();
+                return;
+            }
+
+            if (this.matchShortcut(e, 'focusSearch')) {
+                e.preventDefault();
+                this.searchInput.focus();
+                return;
+            }
+
+            if (this.matchShortcut(e, 'findReplace')) {
+                e.preventDefault();
+                this.openFindReplaceModal();
+                return;
+            }
+
+            if (this.matchShortcut(e, 'clearSearch')) {
+                e.preventDefault();
+                this.clearSearch();
+                return;
             }
         });
     }
@@ -382,6 +547,48 @@ class SubtitleEditor {
                     this.removeSubtitleById(entry.subtitle.id);
                     this.setSelectionById(entry.previousSelectionId || null);
                 }
+                break;
+            case 'split':
+                if (direction === 'undo') {
+                    // Restaurar subtítulo original y eliminar el segundo
+                    const index = this.findSubtitleIndexById(entry.newSubtitle1.id);
+                    if (index !== -1) {
+                        Object.assign(this.subtitles[index], entry.originalSubtitle);
+                        this.removeSubtitleById(entry.newSubtitle2.id);
+                    }
+                } else {
+                    // Rehacer división
+                    const index = this.findSubtitleIndexById(entry.originalSubtitle.id);
+                    if (index !== -1) {
+                        Object.assign(this.subtitles[index], entry.newSubtitle1);
+                        this.subtitles.splice(index + 1, 0, this.cloneSubtitle(entry.newSubtitle2));
+                    }
+                }
+                this.sortSubtitles();
+                break;
+            case 'merge':
+                if (direction === 'undo') {
+                    // Restaurar subtítulos originales
+                    const index = this.findSubtitleIndexById(entry.mergedSubtitle.id);
+                    if (index !== -1) {
+                        Object.assign(this.subtitles[index], entry.previousFirst);
+                        // Reinsert removed subtitles
+                        entry.removedSubtitles.forEach((sub, i) => {
+                            this.subtitles.splice(index + 1 + i, 0, this.cloneSubtitle(sub));
+                        });
+                    }
+                } else {
+                    // Rehacer fusión
+                    const index = this.findSubtitleIndexById(entry.previousFirst.id);
+                    if (index !== -1) {
+                        Object.assign(this.subtitles[index], entry.mergedSubtitle);
+                        // Remove the subtitles that were merged
+                        entry.removedSubtitles.forEach(sub => {
+                            this.removeSubtitleById(sub.id);
+                        });
+                    }
+                }
+                this.sortSubtitles();
                 break;
             default:
                 break;
@@ -1915,6 +2122,763 @@ class SubtitleEditor {
                 toast.parentElement.removeChild(toast);
             }
         }, 300); // Duración de la animación
+    }
+
+    // ===== FIND AND REPLACE =====
+
+    openFindReplaceModal() {
+        if (this.subtitles.length === 0) {
+            this.showToast('warning', 'No hay subtítulos', 'Carga subtítulos para usar la búsqueda y reemplazo.');
+            return;
+        }
+
+        const modal = document.getElementById('findReplaceModal');
+        modal.classList.remove('hidden');
+
+        // Limpiar búsquedas anteriores
+        this.findReplaceMatches = [];
+        this.performFindReplace();
+    }
+
+    closeFindReplaceModal() {
+        const modal = document.getElementById('findReplaceModal');
+        modal.classList.add('hidden');
+    }
+
+    switchFindReplaceTab(tabName) {
+        // Actualizar tabs en el modal de búsqueda y reemplazo
+        const tabs = document.querySelectorAll('#findReplaceModal .sync-tab');
+        tabs.forEach(tab => {
+            if (tab.dataset.tab === tabName) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+
+        // Actualizar contenido
+        const contents = document.querySelectorAll('#findReplaceModal .sync-tab-content');
+        contents.forEach(content => {
+            content.classList.remove('active');
+        });
+
+        document.getElementById(`${tabName}Tab`).classList.add('active');
+
+        // Realizar búsqueda con el nuevo tab
+        this.performFindReplace();
+    }
+
+    getActiveFindReplaceTab() {
+        const activeTab = document.querySelector('#findReplaceModal .sync-tab.active');
+        return activeTab ? activeTab.dataset.tab : 'simple';
+    }
+
+    performFindReplace() {
+        const activeTab = this.getActiveFindReplaceTab();
+        const caseSensitive = document.getElementById('caseSensitive').checked;
+        const wholeWord = document.getElementById('wholeWord').checked;
+
+        let searchTerm = '';
+        let replaceWith = '';
+        let isRegex = false;
+
+        // Obtener términos según el tab activo
+        switch (activeTab) {
+            case 'simple':
+                searchTerm = document.getElementById('findText').value;
+                replaceWith = document.getElementById('replaceText').value;
+                break;
+            case 'regex':
+                searchTerm = document.getElementById('regexPattern').value;
+                replaceWith = document.getElementById('regexReplace').value;
+                isRegex = true;
+                break;
+            case 'advanced':
+                searchTerm = document.getElementById('advancedFindText').value;
+                // No hay reemplazo en modo avanzado por ahora
+                break;
+        }
+
+        if (!searchTerm) {
+            this.displayFindReplaceResults([]);
+            return;
+        }
+
+        const matches = [];
+
+        // Construir regex
+        let regex;
+        try {
+            if (isRegex) {
+                const flags = caseSensitive ? 'g' : 'gi';
+                regex = new RegExp(searchTerm, flags);
+            } else {
+                let pattern = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escapar caracteres especiales
+                if (wholeWord) {
+                    pattern = `\\b${pattern}\\b`;
+                }
+                const flags = caseSensitive ? 'g' : 'gi';
+                regex = new RegExp(pattern, flags);
+            }
+        } catch (error) {
+            console.error('Error en regex:', error);
+            this.displayFindReplaceResults([]);
+            return;
+        }
+
+        // Buscar en subtítulos
+        this.subtitles.forEach((subtitle, index) => {
+            // Aplicar filtros avanzados si están activos
+            if (activeTab === 'advanced') {
+                if (document.getElementById('filterByDuration').checked) {
+                    const minDur = parseFloat(document.getElementById('minDuration').value) * 1000;
+                    const maxDur = parseFloat(document.getElementById('maxDuration').value) * 1000;
+                    const duration = subtitle.endMs - subtitle.startMs;
+                    if (duration < minDur || duration > maxDur) {
+                        return;
+                    }
+                }
+
+                if (document.getElementById('filterByLength').checked) {
+                    const minLen = parseInt(document.getElementById('minLength').value);
+                    const maxLen = parseInt(document.getElementById('maxLength').value);
+                    const length = subtitle.text.length;
+                    if (length < minLen || length > maxLen) {
+                        return;
+                    }
+                }
+            }
+
+            const text = subtitle.text;
+            const match = text.match(regex);
+
+            if (match) {
+                // Calcular texto de reemplazo
+                let replacedText = replaceWith ? text.replace(regex, replaceWith) : text;
+
+                matches.push({
+                    index,
+                    subtitle,
+                    originalText: text,
+                    replacedText,
+                    matchedText: match[0],
+                    selected: true // Por defecto todos seleccionados
+                });
+            }
+        });
+
+        this.findReplaceMatches = matches;
+        this.displayFindReplaceResults(matches);
+    }
+
+    displayFindReplaceResults(matches) {
+        const matchList = document.getElementById('matchList');
+        const matchCount = document.getElementById('matchCount');
+        const applyButton = document.getElementById('applyReplace');
+
+        matchCount.textContent = `${matches.length} coincidencia${matches.length !== 1 ? 's' : ''}`;
+
+        if (matches.length === 0) {
+            matchList.innerHTML = '<p class="no-results">No se encontraron coincidencias.</p>';
+            applyButton.disabled = true;
+            return;
+        }
+
+        applyButton.disabled = false;
+
+        let html = '';
+        matches.forEach((match, matchIndex) => {
+            const hasReplacement = match.replacedText !== match.originalText;
+
+            html += `
+                <div class="match-item ${match.selected ? 'selected' : ''}" data-match-index="${matchIndex}">
+                    <input type="checkbox" class="match-checkbox" ${match.selected ? 'checked' : ''}>
+                    <div class="match-content">
+                        <div class="match-subtitle-num">Subtítulo #${match.index + 1} (${match.subtitle.startTime})</div>
+                        <div class="match-text">${this.highlightMatch(match.originalText, match.matchedText)}</div>
+                        ${hasReplacement ? `
+                            <div class="match-replacement">
+                                → Reemplazar por: ${this.highlightReplacement(match.replacedText, match.matchedText)}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        matchList.innerHTML = html;
+
+        // Agregar event listeners a los checkboxes
+        matchList.querySelectorAll('.match-checkbox').forEach((checkbox, index) => {
+            checkbox.addEventListener('change', (e) => {
+                matches[index].selected = e.target.checked;
+                const matchItem = checkbox.closest('.match-item');
+                if (e.target.checked) {
+                    matchItem.classList.add('selected');
+                } else {
+                    matchItem.classList.remove('selected');
+                }
+            });
+        });
+
+        // Hacer click en el item para navegar al subtítulo
+        matchList.querySelectorAll('.match-item').forEach((item, index) => {
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('match-checkbox')) return;
+                this.selectSubtitle(matches[index].index);
+            });
+        });
+    }
+
+    highlightMatch(text, matchedText) {
+        // Escapar caracteres especiales para regex
+        const escaped = matchedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escaped, 'gi');
+        return text.replace(regex, (match) => `<span class="match-highlight">${match}</span>`);
+    }
+
+    highlightReplacement(text, originalMatch) {
+        // Resaltar el texto nuevo
+        const escaped = originalMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escaped, 'gi');
+        return text.replace(regex, (match) => `<span class="match-replacement-highlight">${match}</span>`);
+    }
+
+    selectAllMatches(select) {
+        if (!this.findReplaceMatches) return;
+
+        this.findReplaceMatches.forEach(match => {
+            match.selected = select;
+        });
+
+        // Actualizar UI
+        const checkboxes = document.querySelectorAll('.match-checkbox');
+        const items = document.querySelectorAll('.match-item');
+
+        checkboxes.forEach((checkbox, index) => {
+            checkbox.checked = select;
+            if (select) {
+                items[index].classList.add('selected');
+            } else {
+                items[index].classList.remove('selected');
+            }
+        });
+    }
+
+    applyReplacements() {
+        if (!this.findReplaceMatches) return;
+
+        const selectedMatches = this.findReplaceMatches.filter(m => m.selected);
+
+        if (selectedMatches.length === 0) {
+            this.showToast('warning', 'Sin selección', 'Selecciona al menos un resultado para reemplazar.');
+            return;
+        }
+
+        // Confirmar con el usuario
+        const confirmMessage = `¿Reemplazar en ${selectedMatches.length} subtítulo${selectedMatches.length > 1 ? 's' : ''}?`;
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // Crear entrada de historia batch
+        const batchChanges = selectedMatches.map(match => ({
+            id: match.subtitle.id,
+            prev: { text: match.originalText },
+            next: { text: match.replacedText }
+        }));
+
+        // Aplicar cambios
+        selectedMatches.forEach(match => {
+            this.subtitles[match.index].text = match.replacedText;
+        });
+
+        // Guardar en historia
+        this.pushHistory({
+            type: 'batch_update',
+            changes: batchChanges
+        });
+
+        this.renderSubtitles();
+        this.closeFindReplaceModal();
+
+        this.showToast('success', 'Reemplazos aplicados', `${selectedMatches.length} subtítulo${selectedMatches.length > 1 ? 's' : ''} actualizado${selectedMatches.length > 1 ? 's' : ''}`);
+    }
+
+    // ===== SPLIT AND MERGE =====
+
+    openSplitModal() {
+        if (this.currentSelectedIndex < 0) {
+            this.showToast('warning', 'Sin selección', 'Selecciona un subtítulo para dividir.');
+            return;
+        }
+
+        const subtitle = this.subtitles[this.currentSelectedIndex];
+        this.splitSubtitleData = {
+            index: this.currentSelectedIndex,
+            subtitle: subtitle
+        };
+
+        // Configurar modal
+        const modal = document.getElementById('splitModal');
+        const textarea = document.getElementById('splitTextarea');
+
+        document.getElementById('splitOriginalTime').textContent = `${subtitle.startTime} → ${subtitle.endTime}`;
+        document.getElementById('splitOriginalText').textContent = subtitle.text;
+
+        textarea.value = subtitle.text;
+        modal.classList.remove('hidden');
+
+        // Focus en textarea
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(Math.floor(subtitle.text.length / 2), Math.floor(subtitle.text.length / 2));
+            this.updateSplitPreview();
+        }, 100);
+
+        // Actualizar posición del cursor en tiempo real
+        textarea.addEventListener('input', () => this.updateSplitPreview());
+        textarea.addEventListener('click', () => this.updateSplitPreview());
+        textarea.addEventListener('keyup', () => this.updateSplitPreview());
+    }
+
+    closeSplitModal() {
+        const modal = document.getElementById('splitModal');
+        modal.classList.add('hidden');
+        this.splitSubtitleData = null;
+    }
+
+    updateSplitPreview() {
+        if (!this.splitSubtitleData) return;
+
+        const textarea = document.getElementById('splitTextarea');
+        const cursorPos = textarea.selectionStart;
+        const text = textarea.value;
+
+        document.getElementById('cursorPosition').textContent = cursorPos;
+
+        const part1 = text.substring(0, cursorPos).trim();
+        const part2 = text.substring(cursorPos).trim();
+
+        // Calcular tiempos proporcionales
+        const totalDuration = this.splitSubtitleData.subtitle.endMs - this.splitSubtitleData.subtitle.startMs;
+        const part1Ratio = part1.length / (part1.length + part2.length || 1);
+        const midTime = this.splitSubtitleData.subtitle.startMs + (totalDuration * part1Ratio);
+
+        document.getElementById('result1Time').textContent =
+            `${this.splitSubtitleData.subtitle.startTime} → ${SRTParser.msToTime(midTime)}`;
+        document.getElementById('result1Text').textContent = part1 || '(vacío)';
+
+        document.getElementById('result2Time').textContent =
+            `${SRTParser.msToTime(midTime)} → ${this.splitSubtitleData.subtitle.endTime}`;
+        document.getElementById('result2Text').textContent = part2 || '(vacío)';
+    }
+
+    applySplitSubtitle() {
+        if (!this.splitSubtitleData) return;
+
+        const textarea = document.getElementById('splitTextarea');
+        const cursorPos = textarea.selectionStart;
+        const text = textarea.value;
+
+        const part1 = text.substring(0, cursorPos).trim();
+        const part2 = text.substring(cursorPos).trim();
+
+        if (!part1 || !part2) {
+            this.showToast('warning', 'División inválida', 'Ambas partes deben tener texto.');
+            return;
+        }
+
+        const originalSubtitle = this.splitSubtitleData.subtitle;
+        const index = this.splitSubtitleData.index;
+
+        // Calcular tiempos
+        const totalDuration = originalSubtitle.endMs - originalSubtitle.startMs;
+        const part1Ratio = part1.length / (part1.length + part2.length);
+        const midTimeMs = originalSubtitle.startMs + (totalDuration * part1Ratio);
+        const midTime = SRTParser.msToTime(midTimeMs);
+
+        // Crear segundo subtítulo
+        const newSubtitle = {
+            id: this.generateSubtitleId(),
+            startTime: midTime,
+            endTime: originalSubtitle.endTime,
+            startMs: midTimeMs,
+            endMs: originalSubtitle.endMs,
+            text: part2
+        };
+
+        // Modificar subtítulo original
+        const previousState = this.cloneSubtitle(originalSubtitle);
+        originalSubtitle.text = part1;
+        originalSubtitle.endTime = midTime;
+        originalSubtitle.endMs = midTimeMs;
+
+        // Insertar nuevo subtítulo
+        this.subtitles.splice(index + 1, 0, newSubtitle);
+
+        // Crear entrada de historia combinada
+        this.pushHistory({
+            type: 'split',
+            originalIndex: index,
+            originalSubtitle: previousState,
+            newSubtitle1: this.cloneSubtitle(originalSubtitle),
+            newSubtitle2: this.cloneSubtitle(newSubtitle)
+        });
+
+        this.sortSubtitles();
+        this.renderSubtitles();
+        this.closeSplitModal();
+
+        this.showToast('success', 'Subtítulo dividido', 'El subtítulo se dividió en 2 partes.');
+    }
+
+    mergeSelectedSubtitles() {
+        // Obtener todos los subtítulos seleccionados (con Ctrl+Click)
+        const selectedItems = this.subtitleList.querySelectorAll('.subtitle-item.selected');
+
+        if (selectedItems.length < 2) {
+            this.showToast('warning', 'Selección insuficiente', 'Selecciona al menos 2 subtítulos consecutivos para fusionar.');
+            return;
+        }
+
+        const selectedIndices = Array.from(selectedItems).map(item => parseInt(item.dataset.index));
+        selectedIndices.sort((a, b) => a - b);
+
+        // Verificar que sean consecutivos
+        for (let i = 1; i < selectedIndices.length; i++) {
+            if (selectedIndices[i] !== selectedIndices[i-1] + 1) {
+                this.showToast('warning', 'Selección no consecutiva', 'Los subtítulos deben ser consecutivos para fusionar.');
+                return;
+            }
+        }
+
+        const firstIndex = selectedIndices[0];
+        const lastIndex = selectedIndices[selectedIndices.length - 1];
+
+        // Confirmar con el usuario
+        if (!confirm(`¿Fusionar ${selectedIndices.length} subtítulos en uno solo?`)) {
+            return;
+        }
+
+        // Obtener subtítulos
+        const subtitlesToMerge = selectedIndices.map(i => this.subtitles[i]);
+        const mergedText = subtitlesToMerge.map(s => s.text).join(' ');
+
+        // Modificar el primer subtítulo
+        const firstSubtitle = this.subtitles[firstIndex];
+        const previousState = this.cloneSubtitle(firstSubtitle);
+
+        firstSubtitle.text = mergedText;
+        firstSubtitle.endTime = this.subtitles[lastIndex].endTime;
+        firstSubtitle.endMs = this.subtitles[lastIndex].endMs;
+
+        // Eliminar los demás
+        const removedSubtitles = this.subtitles.splice(firstIndex + 1, selectedIndices.length - 1);
+
+        // Guardar en historia
+        this.pushHistory({
+            type: 'merge',
+            firstIndex,
+            previousFirst: previousState,
+            mergedSubtitle: this.cloneSubtitle(firstSubtitle),
+            removedSubtitles: removedSubtitles.map(s => this.cloneSubtitle(s))
+        });
+
+        this.sortSubtitles();
+        this.renderSubtitles();
+        this.selectSubtitle(firstIndex);
+
+        this.showToast('success', 'Subtítulos fusionados', `${selectedIndices.length} subtítulos fusionados en uno.`);
+    }
+
+    // ========================================
+    // Keyboard Shortcuts Management
+    // ========================================
+
+    getDefaultShortcuts() {
+        return {
+            navigatePrevious: { key: 'ArrowUp', ctrl: false, shift: false, alt: false },
+            navigateNext: { key: 'ArrowDown', ctrl: false, shift: false, alt: false },
+            jumpToSubtitle: { key: 'Enter', ctrl: false, shift: false, alt: false },
+            togglePlayPause: { key: ' ', ctrl: false, shift: false, alt: false },
+            undo: { key: 'z', ctrl: true, shift: false, alt: false },
+            redo: { key: 'y', ctrl: true, shift: false, alt: false },
+            splitSubtitle: { key: 'd', ctrl: true, shift: true, alt: false },
+            mergeSubtitles: { key: 'm', ctrl: true, shift: true, alt: false },
+            focusSearch: { key: 'f', ctrl: true, shift: false, alt: false },
+            findReplace: { key: 'h', ctrl: true, shift: false, alt: false },
+            clearSearch: { key: 'Escape', ctrl: false, shift: false, alt: false }
+        };
+    }
+
+    getShortcutProfiles() {
+        return {
+            default: this.getDefaultShortcuts(),
+            premiere: {
+                navigatePrevious: { key: 'ArrowUp', ctrl: false, shift: false, alt: false },
+                navigateNext: { key: 'ArrowDown', ctrl: false, shift: false, alt: false },
+                jumpToSubtitle: { key: 'Enter', ctrl: false, shift: false, alt: false },
+                togglePlayPause: { key: ' ', ctrl: false, shift: false, alt: false },
+                undo: { key: 'z', ctrl: true, shift: false, alt: false },
+                redo: { key: 'z', ctrl: true, shift: true, alt: false },
+                splitSubtitle: { key: 's', ctrl: true, shift: false, alt: false },
+                mergeSubtitles: { key: 'm', ctrl: true, shift: false, alt: false },
+                focusSearch: { key: 'f', ctrl: true, shift: false, alt: false },
+                findReplace: { key: 'h', ctrl: true, shift: false, alt: false },
+                clearSearch: { key: 'Escape', ctrl: false, shift: false, alt: false }
+            },
+            aegisub: {
+                navigatePrevious: { key: 'ArrowUp', ctrl: false, shift: false, alt: false },
+                navigateNext: { key: 'ArrowDown', ctrl: false, shift: false, alt: false },
+                jumpToSubtitle: { key: 'Enter', ctrl: false, shift: false, alt: false },
+                togglePlayPause: { key: ' ', ctrl: false, shift: false, alt: false },
+                undo: { key: 'z', ctrl: true, shift: false, alt: false },
+                redo: { key: 'y', ctrl: true, shift: false, alt: false },
+                splitSubtitle: { key: 'd', ctrl: false, shift: false, alt: false },
+                mergeSubtitles: { key: 'j', ctrl: false, shift: false, alt: false },
+                focusSearch: { key: 'f', ctrl: true, shift: false, alt: false },
+                findReplace: { key: 'h', ctrl: true, shift: false, alt: false },
+                clearSearch: { key: 'Escape', ctrl: false, shift: false, alt: false }
+            },
+            vim: {
+                navigatePrevious: { key: 'k', ctrl: false, shift: false, alt: false },
+                navigateNext: { key: 'j', ctrl: false, shift: false, alt: false },
+                jumpToSubtitle: { key: 'Enter', ctrl: false, shift: false, alt: false },
+                togglePlayPause: { key: ' ', ctrl: false, shift: false, alt: false },
+                undo: { key: 'u', ctrl: false, shift: false, alt: false },
+                redo: { key: 'r', ctrl: true, shift: false, alt: false },
+                splitSubtitle: { key: 's', ctrl: false, shift: false, alt: false },
+                mergeSubtitles: { key: 'm', ctrl: false, shift: false, alt: false },
+                focusSearch: { key: '/', ctrl: false, shift: false, alt: false },
+                findReplace: { key: 'h', ctrl: true, shift: false, alt: false },
+                clearSearch: { key: 'Escape', ctrl: false, shift: false, alt: false }
+            }
+        };
+    }
+
+    loadShortcuts() {
+        const saved = localStorage.getItem('srt_editor_shortcuts');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.error('Error loading shortcuts:', e);
+            }
+        }
+        return this.getDefaultShortcuts();
+    }
+
+    saveShortcutsToStorage() {
+        localStorage.setItem('srt_editor_shortcuts', JSON.stringify(this.shortcuts));
+    }
+
+    matchShortcut(event, action) {
+        const shortcut = this.shortcuts[action];
+        if (!shortcut) return false;
+
+        const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase() ||
+                        event.key === shortcut.key;
+        const ctrlMatch = (event.ctrlKey || event.metaKey) === shortcut.ctrl;
+        const shiftMatch = event.shiftKey === shortcut.shift;
+        const altMatch = event.altKey === shortcut.alt;
+
+        return keyMatch && ctrlMatch && shiftMatch && altMatch;
+    }
+
+    formatShortcut(shortcut) {
+        const parts = [];
+        if (shortcut.ctrl) parts.push('Ctrl');
+        if (shortcut.shift) parts.push('Shift');
+        if (shortcut.alt) parts.push('Alt');
+
+        let key = shortcut.key;
+        if (key === ' ') key = 'Space';
+        parts.push(key.charAt(0).toUpperCase() + key.slice(1));
+
+        return parts.join(' + ');
+    }
+
+    toggleCheatSheet() {
+        const modal = document.getElementById('cheatSheetModal');
+        if (modal.classList.contains('hidden')) {
+            this.openCheatSheet();
+        } else {
+            this.closeCheatSheet();
+        }
+    }
+
+    openCheatSheet() {
+        const modal = document.getElementById('cheatSheetModal');
+        modal.classList.remove('hidden');
+        this.updateCheatSheetDisplay();
+    }
+
+    closeCheatSheet() {
+        const modal = document.getElementById('cheatSheetModal');
+        modal.classList.add('hidden');
+    }
+
+    updateCheatSheetDisplay() {
+        // Update the cheat sheet to show current shortcuts
+        const shortcutElements = document.querySelectorAll('#cheatSheetModal .shortcut-keys');
+        const actions = ['navigatePrevious', 'navigateNext', 'jumpToSubtitle', 'togglePlayPause',
+                        'undo', 'redo', 'splitSubtitle', 'mergeSubtitles',
+                        'focusSearch', 'findReplace', 'clearSearch'];
+
+        // Note: This is a simplified version. In a full implementation,
+        // we would map each shortcut element to its action and update accordingly
+    }
+
+    openShortcutConfig() {
+        const modal = document.getElementById('shortcutConfigModal');
+        modal.classList.remove('hidden');
+
+        // Populate inputs with current shortcuts
+        document.querySelectorAll('.shortcut-input').forEach(input => {
+            const action = input.getAttribute('data-action');
+            const shortcut = this.shortcuts[action];
+            if (shortcut) {
+                input.value = this.formatShortcut(shortcut);
+            }
+        });
+
+        // Reset conflict warning
+        document.getElementById('shortcutConflictWarning').classList.add('hidden');
+    }
+
+    closeShortcutConfig() {
+        const modal = document.getElementById('shortcutConfigModal');
+        modal.classList.add('hidden');
+        this.capturingShortcutFor = null;
+    }
+
+    initializeShortcutInputs() {
+        document.querySelectorAll('.shortcut-input').forEach(input => {
+            input.addEventListener('focus', () => {
+                const action = input.getAttribute('data-action');
+                this.capturingShortcutFor = action;
+                input.value = 'Presiona teclas...';
+                input.classList.remove('conflict');
+                input.closest('.config-item')?.classList.remove('conflict');
+            });
+
+            input.addEventListener('blur', () => {
+                if (this.capturingShortcutFor === input.getAttribute('data-action')) {
+                    this.capturingShortcutFor = null;
+                    const shortcut = this.shortcuts[input.getAttribute('data-action')];
+                    if (shortcut) {
+                        input.value = this.formatShortcut(shortcut);
+                    }
+                }
+            });
+        });
+
+        // Clear shortcut buttons
+        document.querySelectorAll('.btn-clear-shortcut').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const input = e.target.closest('.config-item').querySelector('.shortcut-input');
+                const action = input.getAttribute('data-action');
+                delete this.shortcuts[action];
+                input.value = '';
+                this.detectConflicts();
+            });
+        });
+    }
+
+    captureShortcut(event) {
+        if (!this.capturingShortcutFor) return;
+
+        // Ignore modifier-only presses
+        if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) return;
+
+        const action = this.capturingShortcutFor;
+        const input = document.querySelector(`.shortcut-input[data-action="${action}"]`);
+
+        const shortcut = {
+            key: event.key,
+            ctrl: event.ctrlKey || event.metaKey,
+            shift: event.shiftKey,
+            alt: event.altKey
+        };
+
+        this.shortcuts[action] = shortcut;
+        input.value = this.formatShortcut(shortcut);
+        input.blur();
+        this.capturingShortcutFor = null;
+
+        // Check for conflicts
+        this.detectConflicts();
+    }
+
+    detectConflicts() {
+        const conflicts = new Set();
+        const shortcutMap = new Map();
+
+        // Build a map of shortcut strings to actions
+        Object.entries(this.shortcuts).forEach(([action, shortcut]) => {
+            const key = this.formatShortcut(shortcut);
+            if (!shortcutMap.has(key)) {
+                shortcutMap.set(key, []);
+            }
+            shortcutMap.get(key).push(action);
+        });
+
+        // Find conflicts
+        shortcutMap.forEach((actions, key) => {
+            if (actions.length > 1) {
+                actions.forEach(action => conflicts.add(action));
+            }
+        });
+
+        // Update UI
+        const warningElement = document.getElementById('shortcutConflictWarning');
+        document.querySelectorAll('.shortcut-input').forEach(input => {
+            const action = input.getAttribute('data-action');
+            if (conflicts.has(action)) {
+                input.classList.add('conflict');
+                input.closest('.config-item')?.classList.add('conflict');
+            } else {
+                input.classList.remove('conflict');
+                input.closest('.config-item')?.classList.remove('conflict');
+            }
+        });
+
+        if (conflicts.size > 0) {
+            warningElement.classList.remove('hidden');
+        } else {
+            warningElement.classList.add('hidden');
+        }
+
+        return conflicts.size === 0;
+    }
+
+    saveShortcutsConfig() {
+        if (!this.detectConflicts()) {
+            this.showToast('error', 'Conflictos detectados', 'Por favor resuelve los conflictos antes de guardar.');
+            return;
+        }
+
+        this.saveShortcutsToStorage();
+        this.closeShortcutConfig();
+        this.showToast('success', 'Atajos guardados', 'Configuración de atajos guardada correctamente.');
+    }
+
+    resetShortcutsToDefault() {
+        if (confirm('¿Estás seguro de que quieres restaurar los atajos a sus valores predeterminados?')) {
+            this.shortcuts = this.getDefaultShortcuts();
+            this.openShortcutConfig();
+            this.showToast('info', 'Atajos restaurados', 'Los atajos han sido restaurados a sus valores predeterminados.');
+        }
+    }
+
+    applyShortcutProfile(profileName) {
+        const profile = this.shortcutProfiles[profileName];
+        if (profile) {
+            this.shortcuts = JSON.parse(JSON.stringify(profile)); // Deep clone
+            this.openShortcutConfig();
+            this.showToast('info', 'Perfil aplicado', `Perfil "${profileName}" aplicado correctamente.`);
+        }
     }
 }
 
