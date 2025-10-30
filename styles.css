@@ -219,11 +219,18 @@ header h1 {
 }
 
 /* Search Container */
+
 .search-container {
-    position: relative;
     padding: 0.75rem 1rem;
     background: #252525;
     border-bottom: 1px solid #3d3d3d;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.search-input-wrapper {
+    position: relative;
 }
 
 .search-input {
@@ -248,7 +255,7 @@ header h1 {
 
 .btn-clear {
     position: absolute;
-    right: 1.5rem;
+    right: 0.75rem;
     top: 50%;
     transform: translateY(-50%);
     background: transparent;
@@ -271,10 +278,91 @@ header h1 {
     color: #ffffff;
 }
 
+.search-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.search-navigation {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-search {
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    border: 1px solid #404040;
+    background: #333333;
+    color: #e5e7eb;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.btn-search:hover {
+    background: #3f3f3f;
+    transform: translateY(-1px);
+}
+
+.btn-search:active {
+    transform: translateY(0);
+}
+
+.keep-matches-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+    color: #d1d5db;
+}
+
+.keep-matches-toggle input {
+    appearance: none;
+    width: 38px;
+    height: 20px;
+    border-radius: 999px;
+    border: 1px solid #404040;
+    background: #303030;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.keep-matches-toggle input::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #9ca3af;
+    transform: translateY(-50%);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.keep-matches-toggle input:checked {
+    background: #2563eb;
+    border-color: #1d4ed8;
+}
+
+.keep-matches-toggle input:checked::after {
+    transform: translate(15px, -50%);
+    background: #ffffff;
+}
+
+.keep-matches-toggle input:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 2px;
+}
+
 .search-results {
-    margin-top: 0.5rem;
     font-size: 0.8rem;
     color: #a0a0a0;
+    min-height: 1em;
 }
 
 /* Navigation Info */
@@ -354,15 +442,9 @@ header h1 {
     display: none;
 }
 
-.subtitle-item.search-match .subtitle-text {
-    background: #3a3a2a;
-}
-
-.subtitle-item.search-match mark {
-    background: #fbbf24;
-    color: #000000;
-    padding: 0.1rem 0.2rem;
-    border-radius: 2px;
+.subtitle-item.search-match .subtitle-text-wrapper {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
 }
 
 .subtitle-header {
@@ -400,22 +482,60 @@ header h1 {
     border-color: #2563eb;
 }
 
+.subtitle-text-wrapper {
+    position: relative;
+    border: 1px solid #505050;
+    border-radius: 6px;
+    background: rgba(45, 45, 45, 0.9);
+    overflow: hidden;
+}
+
+.subtitle-text-wrapper:focus-within {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+}
+
 .subtitle-text {
     width: 100%;
     padding: 0.5rem;
-    border: 1px solid #505050;
-    border-radius: 4px;
-    background: #2d2d2d;
+    border: none;
+    background: transparent;
     color: #ffffff;
     font-family: inherit;
     font-size: 0.9rem;
     resize: vertical;
     min-height: 50px;
+    position: relative;
+    z-index: 1;
 }
 
 .subtitle-text:focus {
     outline: none;
-    border-color: #2563eb;
+}
+
+.subtitle-text-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0.5rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: transparent;
+    pointer-events: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    transition: transform 0.1s ease-out;
+    z-index: 0;
+}
+
+.subtitle-text-overlay mark {
+    background: rgba(37, 99, 235, 0.35);
+    box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.35);
+    border-radius: 3px;
+    color: transparent;
 }
 
 /* Scrollbar */
