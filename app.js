@@ -20,6 +20,7 @@ class SubtitleEditor {
         this.searchInput = document.getElementById('searchInput');
         this.clearSearchBtn = document.getElementById('clearSearch');
         this.searchResults = document.getElementById('searchResults');
+        this.validationSummary = document.getElementById('validationSummary');
 
         this.initializeEventListeners();
         this.initializeKeyboardShortcuts();
@@ -220,6 +221,8 @@ class SubtitleEditor {
         if (this.searchQuery) {
             this.filterSubtitles();
         }
+
+        this.updateValidationSummary();
     }
 
     // Crear elemento de subtítulo
@@ -229,13 +232,16 @@ class SubtitleEditor {
         item.dataset.index = index;
         item.dataset.id = subtitle.id;
 
+        const startInput = this.createTimeInputTemplate('startTime', subtitle.startTime);
+        const endInput = this.createTimeInputTemplate('endTime', subtitle.endTime);
+
         item.innerHTML = `
             <div class="subtitle-header">
                 <span class="subtitle-number">#${index + 1}</span>
                 <div class="subtitle-times">
-                    <input type="text" class="time-input" data-field="startTime" value="${subtitle.startTime}">
+                    ${startInput}
                     <span>→</span>
-                    <input type="text" class="time-input" data-field="endTime" value="${subtitle.endTime}">
+                    ${endInput}
                 </div>
             </div>
             <textarea class="subtitle-text" rows="2">${subtitle.text}</textarea>
@@ -257,6 +263,12 @@ class SubtitleEditor {
         timeInputs.forEach(input => {
             input.addEventListener('change', (e) => {
                 this.updateSubtitleTime(index, e.target.dataset.field, e.target.value);
+            });
+
+            input.addEventListener('input', (e) => {
+                if (e.target.dataset.invalid === 'true' && this.isValidTime(e.target.value)) {
+                    this.clearTimeInputError(e.target);
+                }
             });
 
             input.addEventListener('click', (e) => {
@@ -361,22 +373,97 @@ class SubtitleEditor {
 
     // Actualizar tiempo de subtítulo
     updateSubtitleTime(index, field, value) {
+        const subtitle = this.subtitles[index];
+        const item = this.subtitleList.querySelector(`[data-index="${index}"]`);
+        const input = item ? item.querySelector(`.time-input[data-field="${field}"]`) : null;
+
         try {
-            const subtitle = this.subtitles[index];
+            if (!this.isValidTime(value)) {
+                throw new Error('Formato de tiempo inválido. Usa HH:MM:SS,mmm');
+            }
+
+            const msValue = SRTParser.timeToMs(value);
+
             subtitle[field] = value;
 
-            // Actualizar también los milisegundos
             if (field === 'startTime') {
-                subtitle.startMs = SRTParser.timeToMs(value);
+                subtitle.startMs = msValue;
             } else if (field === 'endTime') {
-                subtitle.endMs = SRTParser.timeToMs(value);
+                subtitle.endMs = msValue;
+            }
+
+            if (input) {
+                this.clearTimeInputError(input);
             }
 
             console.log(`Tiempo actualizado para subtítulo #${index + 1}`);
         } catch (error) {
             console.error('Error al actualizar tiempo:', error);
-            alert('Formato de tiempo inválido. Usa HH:MM:SS,mmm');
+            if (input) {
+                this.setTimeInputInvalid(input, error.message);
+            }
         }
+    }
+
+    createTimeInputTemplate(field, value) {
+        return `
+            <div class="time-input-wrapper">
+                <input type="text" class="time-input" data-field="${field}" value="${value}" placeholder="HH:MM:SS,mmm">
+                <span class="time-input-error" role="alert">Formato inválido. Usa HH:MM:SS,mmm</span>
+            </div>
+        `;
+    }
+
+    setTimeInputInvalid(input, message) {
+        input.dataset.invalid = 'true';
+        input.setAttribute('aria-invalid', 'true');
+
+        const errorMessage = input.nextElementSibling;
+        if (errorMessage) {
+            errorMessage.textContent = message;
+        }
+
+        this.updateValidationSummary();
+    }
+
+    clearTimeInputError(input) {
+        if (!input) return;
+
+        if (input.dataset.invalid) {
+            delete input.dataset.invalid;
+        }
+        input.removeAttribute('aria-invalid');
+
+        const errorMessage = input.nextElementSibling;
+        if (errorMessage) {
+            errorMessage.textContent = 'Formato inválido. Usa HH:MM:SS,mmm';
+        }
+
+        this.updateValidationSummary();
+    }
+
+    updateValidationSummary() {
+        if (!this.validationSummary) return;
+
+        const invalidInputs = this.subtitleList.querySelectorAll('.time-input[data-invalid="true"]');
+        if (invalidInputs.length > 0) {
+            this.validationSummary.textContent = 'Corrige los campos de tiempo marcados en rojo.';
+            this.validationSummary.classList.add('visible');
+        } else {
+            this.validationSummary.textContent = '';
+            this.validationSummary.classList.remove('visible');
+        }
+    }
+
+    isValidTime(value) {
+        if (typeof value !== 'string') return false;
+        const match = value.trim().match(/^(\d{2}):(\d{2}):(\d{2}),(\d{3})$/);
+        if (!match) return false;
+
+        const minutes = parseInt(match[2], 10);
+        const seconds = parseInt(match[3], 10);
+
+        return minutes < 60 && seconds < 60;
     }
 
     // Actualizar texto de subtítulo

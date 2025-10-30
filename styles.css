@@ -384,6 +384,13 @@ header h1 {
     gap: 0.5rem;
 }
 
+.time-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    align-items: flex-start;
+}
+
 .time-input {
     padding: 0.25rem 0.5rem;
     border: 1px solid #505050;
@@ -398,6 +405,26 @@ header h1 {
 .time-input:focus {
     outline: none;
     border-color: #2563eb;
+}
+
+.time-input[data-invalid="true"] {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4);
+}
+
+.time-input[data-invalid="true"]:focus {
+    border-color: #f87171;
+}
+
+.time-input-error {
+    display: none;
+    font-size: 0.7rem;
+    color: #fca5a5;
+    margin-top: 0.25rem;
+}
+
+.time-input[data-invalid="true"] + .time-input-error {
+    display: block;
 }
 
 .subtitle-text {
@@ -416,6 +443,22 @@ header h1 {
 .subtitle-text:focus {
     outline: none;
     border-color: #2563eb;
+}
+
+.validation-summary {
+    display: none;
+    margin-top: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid rgba(220, 38, 38, 0.6);
+    background: rgba(220, 38, 38, 0.15);
+    color: #fca5a5;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.validation-summary.visible {
+    display: block;
 }
 
 /* Scrollbar */
