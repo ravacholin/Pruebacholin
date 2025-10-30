@@ -198,11 +198,106 @@ header h1 {
 .editor-header h2 {
     font-size: 1.2rem;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.subtitle-count {
+    display: inline-block;
+    background: #404040;
+    color: #a0a0a0;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
 }
 
 .editor-actions {
     display: flex;
     gap: 0.5rem;
+}
+
+/* Search Container */
+.search-container {
+    position: relative;
+    padding: 0.75rem 1rem;
+    background: #252525;
+    border-bottom: 1px solid #3d3d3d;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+    border: 2px solid #404040;
+    border-radius: 6px;
+    background: #2d2d2d;
+    color: #ffffff;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
+.search-input::placeholder {
+    color: #707070;
+}
+
+.btn-clear {
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: #707070;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: none;
+}
+
+.btn-clear.visible {
+    display: block;
+}
+
+.btn-clear:hover {
+    background: #404040;
+    color: #ffffff;
+}
+
+.search-results {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #a0a0a0;
+}
+
+/* Navigation Info */
+.navigation-info {
+    padding: 0.5rem 1rem;
+    background: #252525;
+    border-bottom: 1px solid #3d3d3d;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.info-label {
+    color: #a0a0a0;
+    font-weight: 600;
+}
+
+.info-text {
+    color: #707070;
 }
 
 .subtitle-list {
@@ -247,6 +342,27 @@ header h1 {
 
 .subtitle-item.active {
     border-color: #16a34a;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+}
+
+.subtitle-item.selected.active {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2), inset 0 0 0 1px #16a34a;
+}
+
+.subtitle-item.hidden {
+    display: none;
+}
+
+.subtitle-item.search-match .subtitle-text {
+    background: #3a3a2a;
+}
+
+.subtitle-item.search-match mark {
+    background: #fbbf24;
+    color: #000000;
+    padding: 0.1rem 0.2rem;
+    border-radius: 2px;
 }
 
 .subtitle-header {

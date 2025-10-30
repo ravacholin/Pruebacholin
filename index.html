@@ -54,10 +54,31 @@
             <!-- Subtitle Editor Section -->
             <div class="editor-section">
                 <div class="editor-header">
-                    <h2>Subtítulos</h2>
+                    <h2>Subtítulos <span id="subtitleCount" class="subtitle-count">0</span></h2>
                     <div class="editor-actions">
                         <button id="addSubtitle" class="btn btn-small">+ Nuevo</button>
                         <button id="deleteSelected" class="btn btn-small btn-danger">🗑 Eliminar</button>
+                    </div>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <input
+                        type="text"
+                        id="searchInput"
+                        class="search-input"
+                        placeholder="Buscar en subtítulos... (Ctrl+F)"
+                        autocomplete="off"
+                    >
+                    <button id="clearSearch" class="btn-clear" title="Limpiar búsqueda">✕</button>
+                    <div id="searchResults" class="search-results"></div>
+                </div>
+
+                <!-- Navigation Info -->
+                <div class="navigation-info">
+                    <div class="info-item">
+                        <span class="info-label">Navegación:</span>
+                        <span class="info-text">↑↓ para navegar • Enter para saltar • Espacio para play/pause</span>
                     </div>
                 </div>
 
