@@ -83,15 +83,17 @@ class SRTParser {
      * @returns {string} Contenido del archivo SRT
      */
     static stringify(subtitles) {
-        let srtContent = '';
+        const blocks = subtitles.map((subtitle, index) => {
+            const hasStartMs = Number.isFinite(subtitle.startMs);
+            const hasEndMs = Number.isFinite(subtitle.endMs);
+            const startTime = hasStartMs ? SRTParser.msToTime(subtitle.startMs) : subtitle.startTime;
+            const endTime = hasEndMs ? SRTParser.msToTime(subtitle.endMs) : subtitle.endTime;
+            const text = (subtitle.text || '').replace(/\r\n/g, '\n');
 
-        subtitles.forEach((subtitle, index) => {
-            srtContent += `${index + 1}\n`;
-            srtContent += `${subtitle.startTime} --> ${subtitle.endTime}\n`;
-            srtContent += `${subtitle.text}\n\n`;
+            return `${index + 1}\n${startTime} --> ${endTime}\n${text}`;
         });
 
-        return srtContent.trim();
+        return `${blocks.join('\n\n')}\n`;
     }
 
     /**

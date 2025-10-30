@@ -61,6 +61,50 @@
                     </div>
                 </div>
 
+                <aside class="timing-panel" aria-labelledby="timingPanelTitle">
+                    <h3 id="timingPanelTitle">Sincronización y offsets</h3>
+
+                    <form id="globalOffsetForm" class="timing-form" autocomplete="off">
+                        <label for="globalOffsetInput">Offset global (ms)</label>
+                        <div class="timing-form-row">
+                            <input type="number" id="globalOffsetInput" name="globalOffset" placeholder="± milisegundos" step="1">
+                            <button type="submit" class="btn btn-small">Aplicar</button>
+                        </div>
+                        <p class="timing-helper">Desplaza todos los subtítulos en el tiempo.</p>
+                    </form>
+
+                    <form id="rangeOffsetForm" class="timing-form" autocomplete="off">
+                        <label>Offset desde un índice</label>
+                        <div class="timing-grid">
+                            <div class="timing-field">
+                                <span class="timing-field-label">Inicio (#)</span>
+                                <input type="number" id="rangeOffsetStart" min="1" step="1" placeholder="1">
+                            </div>
+                            <div class="timing-field">
+                                <span class="timing-field-label">Fin (#)</span>
+                                <input type="number" id="rangeOffsetEnd" min="1" step="1" placeholder="Último">
+                            </div>
+                            <div class="timing-field">
+                                <span class="timing-field-label">Offset (ms)</span>
+                                <input type="number" id="rangeOffsetValue" step="1" placeholder="± milisegundos">
+                            </div>
+                        </div>
+                        <div class="timing-form-row">
+                            <button type="submit" class="btn btn-small">Aplicar</button>
+                        </div>
+                        <p class="timing-helper">Afecta al rango indicado (fin opcional para aplicar hasta el último).</p>
+                    </form>
+
+                    <form id="stretchForm" class="timing-form" autocomplete="off">
+                        <label for="stretchPercent">Estiramiento porcentual (%)</label>
+                        <div class="timing-form-row">
+                            <input type="number" id="stretchPercent" step="0.1" placeholder="Ej. 5 o -2.5">
+                            <button type="submit" class="btn btn-small">Aplicar</button>
+                        </div>
+                        <p class="timing-helper">Ajusta las duraciones proporcionalmente desde el primer subtítulo.</p>
+                    </form>
+                </aside>
+
                 <!-- Search Bar -->
                 <div class="search-container">
                     <input
