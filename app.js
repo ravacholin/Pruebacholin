@@ -17,12 +17,20 @@ class SubtitleEditor {
         this.currentTimeDisplay = document.getElementById('currentTime');
         this.durationDisplay = document.getElementById('duration');
         this.subtitleCount = document.getElementById('subtitleCount');
+        this.timelineSummary = document.getElementById('timelineSummary');
         this.searchInput = document.getElementById('searchInput');
         this.clearSearchBtn = document.getElementById('clearSearch');
         this.searchResults = document.getElementById('searchResults');
 
         this.initializeEventListeners();
         this.initializeKeyboardShortcuts();
+
+        this.timelineValidation = SubtitleEditor.validateTimelineData(this.subtitles);
+        this.updateTimelineSummary(this.timelineValidation);
+    }
+
+    static get GAP_THRESHOLD_MS() {
+        return 2000;
     }
 
     initializeEventListeners() {
@@ -181,6 +189,19 @@ class SubtitleEditor {
             return;
         }
 
+        const validation = this.timelineValidation || this.validateTimeline();
+        if (validation && validation.hasBlockingConflicts) {
+            alert('No se puede guardar mientras existan conflictos en la cronología. Corrige los errores e inténtalo nuevamente.');
+            return;
+        }
+
+        if (validation && validation.warningsCount) {
+            const proceed = confirm('Se detectaron huecos extensos entre subtítulos. ¿Deseas guardar de todas formas?');
+            if (!proceed) {
+                return;
+            }
+        }
+
         const srtContent = SRTParser.stringify(this.subtitles);
         const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -206,6 +227,8 @@ class SubtitleEditor {
                     <p>Carga un archivo SRT para comenzar</p>
                 </div>
             `;
+            this.timelineValidation = SubtitleEditor.validateTimelineData(this.subtitles);
+            this.updateTimelineSummary(this.timelineValidation);
             return;
         }
 
@@ -220,6 +243,8 @@ class SubtitleEditor {
         if (this.searchQuery) {
             this.filterSubtitles();
         }
+
+        this.validateTimeline();
     }
 
     // Crear elemento de subtítulo
@@ -239,6 +264,7 @@ class SubtitleEditor {
                 </div>
             </div>
             <textarea class="subtitle-text" rows="2">${subtitle.text}</textarea>
+            <div class="timeline-alert" data-role="timeline-alert"></div>
         `;
 
         // Click en el item para saltar al video
@@ -373,6 +399,7 @@ class SubtitleEditor {
             }
 
             console.log(`Tiempo actualizado para subtítulo #${index + 1}`);
+            this.validateTimeline();
         } catch (error) {
             console.error('Error al actualizar tiempo:', error);
             alert('Formato de tiempo inválido. Usa HH:MM:SS,mmm');
@@ -382,6 +409,244 @@ class SubtitleEditor {
     // Actualizar texto de subtítulo
     updateSubtitleText(index, text) {
         this.subtitles[index].text = text;
+    }
+
+    // Validar cronología de subtítulos
+    validateTimeline() {
+        this.timelineValidation = SubtitleEditor.validateTimelineData(this.subtitles);
+        this.applyTimelineValidation();
+        return this.timelineValidation;
+    }
+
+    static validateTimelineData(subtitles, gapThresholdMs = SubtitleEditor.GAP_THRESHOLD_MS) {
+        const issuesById = {};
+        const overlaps = [];
+        const negativeDurations = [];
+        const largeGaps = [];
+
+        const registerIssue = (id, issue) => {
+            if (!issuesById[id]) {
+                issuesById[id] = [];
+            }
+            issuesById[id].push(issue);
+        };
+
+        const normalized = (subtitles || []).map(subtitle => {
+            const startMs = SubtitleEditor.resolveMs(subtitle, 'start');
+            const endMs = SubtitleEditor.resolveMs(subtitle, 'end');
+            return {
+                id: subtitle.id,
+                startMs,
+                endMs
+            };
+        }).filter(subtitle => typeof subtitle.id !== 'undefined');
+
+        const sorted = [...normalized].sort((a, b) => {
+            const startA = Number.isFinite(a.startMs) ? a.startMs : Number.POSITIVE_INFINITY;
+            const startB = Number.isFinite(b.startMs) ? b.startMs : Number.POSITIVE_INFINITY;
+            return startA - startB;
+        });
+
+        sorted.forEach((subtitle, index) => {
+            if (!Number.isFinite(subtitle.startMs) || !Number.isFinite(subtitle.endMs)) {
+                return;
+            }
+
+            if (subtitle.endMs <= subtitle.startMs) {
+                const issue = { type: 'negativeDuration', severity: 'error' };
+                registerIssue(subtitle.id, issue);
+                negativeDurations.push({ id: subtitle.id });
+            }
+
+            const next = sorted[index + 1];
+            if (!next || !Number.isFinite(next.startMs)) {
+                return;
+            }
+
+            if (subtitle.endMs > next.startMs) {
+                const overlap = {
+                    fromId: subtitle.id,
+                    toId: next.id,
+                    overlapMs: subtitle.endMs - next.startMs
+                };
+                overlaps.push(overlap);
+                const issue = {
+                    type: 'overlap',
+                    severity: 'error',
+                    relatedId: next.id,
+                    overlapMs: overlap.overlapMs
+                };
+                registerIssue(subtitle.id, issue);
+                registerIssue(next.id, {
+                    type: 'overlap',
+                    severity: 'error',
+                    relatedId: subtitle.id,
+                    overlapMs: overlap.overlapMs
+                });
+            } else if (Number.isFinite(subtitle.endMs)) {
+                const gapMs = next.startMs - subtitle.endMs;
+                if (gapMs > gapThresholdMs) {
+                    const gap = {
+                        fromId: subtitle.id,
+                        toId: next.id,
+                        gapMs
+                    };
+                    largeGaps.push(gap);
+                    registerIssue(next.id, {
+                        type: 'largeGap',
+                        severity: 'warning',
+                        fromId: subtitle.id,
+                        gapMs
+                    });
+                }
+            }
+        });
+
+        return {
+            issuesById,
+            overlaps,
+            negativeDurations,
+            largeGaps,
+            hasBlockingConflicts: overlaps.length > 0 || negativeDurations.length > 0,
+            blockingCount: overlaps.length + negativeDurations.length,
+            warningsCount: largeGaps.length
+        };
+    }
+
+    static resolveMs(subtitle, fieldPrefix) {
+        const msField = fieldPrefix === 'start' ? 'startMs' : 'endMs';
+        const timeField = fieldPrefix === 'start' ? 'startTime' : 'endTime';
+
+        if (typeof subtitle[msField] === 'number' && !Number.isNaN(subtitle[msField])) {
+            return subtitle[msField];
+        }
+
+        if (typeof subtitle[timeField] === 'string') {
+            return SubtitleEditor.parseTimeToMs(subtitle[timeField]);
+        }
+
+        return NaN;
+    }
+
+    static parseTimeToMs(timeStr) {
+        if (typeof timeStr !== 'string') {
+            return NaN;
+        }
+
+        const match = timeStr.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
+        if (!match) {
+            return NaN;
+        }
+
+        const [, hours, minutes, seconds, milliseconds] = match;
+        return (Number(hours) * 3600000)
+            + (Number(minutes) * 60000)
+            + (Number(seconds) * 1000)
+            + Number(milliseconds);
+    }
+
+    applyTimelineValidation() {
+        if (!this.subtitleList) {
+            return;
+        }
+
+        const displayIndexMap = new Map();
+        this.subtitles.forEach((subtitle, index) => {
+            displayIndexMap.set(subtitle.id, index + 1);
+        });
+
+        const items = this.subtitleList.querySelectorAll('.subtitle-item');
+        items.forEach(item => {
+            const id = Number(item.dataset.id);
+            const issues = (this.timelineValidation && this.timelineValidation.issuesById[id]) || [];
+            const alertEl = item.querySelector('[data-role="timeline-alert"]');
+
+            item.classList.remove('timeline-error', 'timeline-warning');
+
+            if (!issues.length) {
+                if (alertEl) {
+                    alertEl.textContent = '';
+                    alertEl.style.display = 'none';
+                }
+                return;
+            }
+
+            const messages = [];
+            let hasError = false;
+            let hasWarning = false;
+
+            issues.forEach(issue => {
+                if (issue.severity === 'error') {
+                    hasError = true;
+                }
+                if (issue.severity === 'warning') {
+                    hasWarning = true;
+                }
+
+                if (issue.type === 'overlap') {
+                    const relatedIndex = displayIndexMap.get(issue.relatedId);
+                    messages.push(relatedIndex ? `Solapa con #${relatedIndex}` : 'Solapa con otro subtítulo');
+                } else if (issue.type === 'negativeDuration') {
+                    messages.push('Duración negativa');
+                } else if (issue.type === 'largeGap') {
+                    const fromIndex = displayIndexMap.get(issue.fromId);
+                    const seconds = (issue.gapMs / 1000).toFixed(1);
+                    messages.push(fromIndex ? `Hueco de ${seconds}s tras #${fromIndex}` : `Hueco de ${seconds}s`);
+                }
+            });
+
+            if (hasError) {
+                item.classList.add('timeline-error');
+            } else if (hasWarning) {
+                item.classList.add('timeline-warning');
+            }
+
+            if (alertEl) {
+                alertEl.textContent = messages.join(' • ');
+                alertEl.style.display = messages.length ? 'block' : 'none';
+            }
+        });
+
+        this.updateTimelineSummary(this.timelineValidation);
+    }
+
+    updateTimelineSummary(validation) {
+        if (!this.timelineSummary) {
+            return;
+        }
+
+        this.timelineSummary.classList.remove('ok', 'warning', 'error');
+
+        if (!this.subtitles.length) {
+            this.timelineSummary.textContent = 'Sin subtítulos cargados.';
+            return;
+        }
+
+        if (!validation) {
+            this.timelineSummary.textContent = 'Validando subtítulos...';
+            return;
+        }
+
+        const { blockingCount, warningsCount, hasBlockingConflicts } = validation;
+
+        if (!blockingCount && !warningsCount) {
+            this.timelineSummary.textContent = 'Cronología correcta.';
+            this.timelineSummary.classList.add('ok');
+            return;
+        }
+
+        const parts = [];
+        if (blockingCount) {
+            const conflictText = blockingCount === 1 ? '1 conflicto' : `${blockingCount} conflictos`;
+            parts.push(conflictText);
+        }
+        if (warningsCount) {
+            const warningText = warningsCount === 1 ? '1 advertencia' : `${warningsCount} advertencias`;
+            parts.push(warningText);
+        }
+
+        this.timelineSummary.textContent = parts.join(' • ');
+        this.timelineSummary.classList.add(hasBlockingConflicts ? 'error' : 'warning');
     }
 
     // Actualizar subtítulo activo en el overlay
@@ -555,7 +820,15 @@ class SubtitleEditor {
 }
 
 // Inicializar la aplicación cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', () => {
-    const editor = new SubtitleEditor();
-    console.log('Editor de Subtítulos SRT iniciado');
-});
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        const editor = new SubtitleEditor();
+        console.log('Editor de Subtítulos SRT iniciado');
+    });
+}
+
+if (typeof module !== 'undefined') {
+    module.exports = {
+        validateTimelineData: SubtitleEditor.validateTimelineData.bind(SubtitleEditor)
+    };
+}
