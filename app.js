@@ -9,6 +9,9 @@ class SubtitleEditor {
         this.searchQuery = '';
         this.filteredSubtitles = [];
         this.autoScrollEnabled = true;
+        this.history = [];
+        this.future = [];
+        this.nextSubtitleId = 1;
 
         // Elementos del DOM
         this.videoPlayer = document.getElementById('videoPlayer');
@@ -20,9 +23,12 @@ class SubtitleEditor {
         this.searchInput = document.getElementById('searchInput');
         this.clearSearchBtn = document.getElementById('clearSearch');
         this.searchResults = document.getElementById('searchResults');
+        this.undoButton = document.getElementById('undoAction');
+        this.redoButton = document.getElementById('redoAction');
 
         this.initializeEventListeners();
         this.initializeKeyboardShortcuts();
+        this.updateUndoRedoButtons();
     }
 
     initializeEventListeners() {
@@ -87,6 +93,18 @@ class SubtitleEditor {
             this.deleteSelectedSubtitle();
         });
 
+        if (this.undoButton) {
+            this.undoButton.addEventListener('click', () => {
+                this.undo();
+            });
+        }
+
+        if (this.redoButton) {
+            this.redoButton.addEventListener('click', () => {
+                this.redo();
+            });
+        }
+
         // Búsqueda de subtítulos
         this.searchInput.addEventListener('input', (e) => {
             this.searchQuery = e.target.value;
@@ -101,10 +119,25 @@ class SubtitleEditor {
     // Inicializar atajos de teclado
     initializeKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
+            const isModifier = e.ctrlKey || e.metaKey;
+            const key = e.key.toLowerCase();
+
+            if (isModifier && key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undo();
+                return;
+            }
+
+            if ((isModifier && key === 'y') || ((e.metaKey || e.ctrlKey) && e.shiftKey && key === 'z')) {
+                e.preventDefault();
+                this.redo();
+                return;
+            }
+
             // No activar shortcuts si se está editando un input/textarea
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                 // Permitir Ctrl+F incluso en inputs
-                if (e.ctrlKey && e.key === 'f') {
+                if (isModifier && key === 'f') {
                     e.preventDefault();
                     this.searchInput.focus();
                 }
@@ -147,6 +180,166 @@ class SubtitleEditor {
         });
     }
 
+    updateUndoRedoButtons() {
+        if (this.undoButton) {
+            this.undoButton.disabled = this.history.length === 0;
+        }
+
+        if (this.redoButton) {
+            this.redoButton.disabled = this.future.length === 0;
+        }
+    }
+
+    pushHistory(entry) {
+        this.history.push(entry);
+        this.future = [];
+        this.updateUndoRedoButtons();
+    }
+
+    resetHistory() {
+        this.history = [];
+        this.future = [];
+        this.updateUndoRedoButtons();
+    }
+
+    undo() {
+        if (this.history.length === 0) return;
+
+        const entry = this.history.pop();
+        this.applyHistoryEntry(entry, 'undo');
+        this.future.push(entry);
+        this.renderSubtitles();
+        this.updateUndoRedoButtons();
+    }
+
+    redo() {
+        if (this.future.length === 0) return;
+
+        const entry = this.future.pop();
+        this.applyHistoryEntry(entry, 'redo');
+        this.history.push(entry);
+        this.renderSubtitles();
+        this.updateUndoRedoButtons();
+    }
+
+    applyHistoryEntry(entry, direction) {
+        switch (entry.type) {
+            case 'update': {
+                const patch = direction === 'undo' ? entry.prev : entry.next;
+                const index = this.findSubtitleIndexById(entry.id);
+                if (index === -1) return;
+
+                Object.assign(this.subtitles[index], patch);
+
+                if (patch.startMs !== undefined || patch.endMs !== undefined) {
+                    this.sortSubtitles();
+                }
+
+                this.setSelectionById(entry.id);
+                break;
+            }
+            case 'add':
+                if (direction === 'undo') {
+                    this.removeSubtitleById(entry.subtitle.id);
+                    this.setSelectionById(entry.previousSelectionId || null);
+                } else {
+                    this.insertSubtitle(entry.subtitle);
+                    this.setSelectionById(entry.subtitle.id);
+                }
+                break;
+            case 'delete':
+                if (direction === 'undo') {
+                    this.insertSubtitle(entry.subtitle);
+                    this.setSelectionById(entry.subtitle.id);
+                } else {
+                    this.removeSubtitleById(entry.subtitle.id);
+                    this.setSelectionById(entry.previousSelectionId || null);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    cloneSubtitle(subtitle) {
+        return {
+            id: subtitle.id,
+            startTime: subtitle.startTime,
+            endTime: subtitle.endTime,
+            startMs: subtitle.startMs,
+            endMs: subtitle.endMs,
+            text: subtitle.text
+        };
+    }
+
+    findSubtitleIndexById(id) {
+        return this.subtitles.findIndex(subtitle => subtitle.id === id);
+    }
+
+    insertSubtitle(subtitle) {
+        const clone = this.cloneSubtitle(subtitle);
+        this.subtitles.push(clone);
+        this.sortSubtitles();
+        this.nextSubtitleId = Math.max(this.nextSubtitleId, clone.id + 1);
+        return this.findSubtitleIndexById(clone.id);
+    }
+
+    removeSubtitleById(id) {
+        const index = this.findSubtitleIndexById(id);
+        if (index === -1) return null;
+
+        const [removed] = this.subtitles.splice(index, 1);
+        return removed;
+    }
+
+    sortSubtitles() {
+        this.subtitles.sort((a, b) => a.startMs - b.startMs);
+        this.updateSelectionTracking();
+    }
+
+    setSelectionById(id) {
+        if (!id) {
+            this.selectedSubtitleId = null;
+            this.currentSelectedIndex = -1;
+            return;
+        }
+
+        const index = this.findSubtitleIndexById(id);
+        if (index !== -1) {
+            this.selectedSubtitleId = id;
+            this.currentSelectedIndex = index;
+        } else {
+            this.selectedSubtitleId = null;
+            this.currentSelectedIndex = -1;
+        }
+    }
+
+    updateSelectionTracking() {
+        if (this.selectedSubtitleId === null) {
+            this.currentSelectedIndex = -1;
+            return;
+        }
+
+        const index = this.findSubtitleIndexById(this.selectedSubtitleId);
+        if (index !== -1) {
+            this.currentSelectedIndex = index;
+        } else {
+            this.selectedSubtitleId = null;
+            this.currentSelectedIndex = -1;
+        }
+    }
+
+    generateSubtitleId() {
+        const id = this.nextSubtitleId;
+        this.nextSubtitleId += 1;
+        return id;
+    }
+
+    recalculateNextSubtitleId() {
+        const maxId = this.subtitles.reduce((max, subtitle) => Math.max(max, subtitle.id || 0), 0);
+        this.nextSubtitleId = maxId + 1;
+    }
+
     // Cargar video
     loadVideo(file) {
         if (!file) return;
@@ -166,6 +359,10 @@ class SubtitleEditor {
         try {
             const text = await file.text();
             this.subtitles = SRTParser.parse(text);
+            this.selectedSubtitleId = null;
+            this.currentSelectedIndex = -1;
+            this.resetHistory();
+            this.recalculateNextSubtitleId();
             this.renderSubtitles();
             console.log('SRT cargado:', this.subtitles.length, 'subtítulos');
         } catch (error) {
@@ -198,6 +395,7 @@ class SubtitleEditor {
     renderSubtitles() {
         // Actualizar contador
         this.subtitleCount.textContent = this.subtitles.length;
+        this.updateSelectionTracking();
 
         if (this.subtitles.length === 0) {
             this.subtitleList.innerHTML = `
@@ -273,6 +471,11 @@ class SubtitleEditor {
         textarea.addEventListener('click', (e) => {
             e.stopPropagation();
         });
+
+        if (this.selectedSubtitleId === subtitle.id) {
+            item.classList.add('selected');
+            this.currentSelectedIndex = index;
+        }
 
         return item;
     }
@@ -363,25 +566,78 @@ class SubtitleEditor {
     updateSubtitleTime(index, field, value) {
         try {
             const subtitle = this.subtitles[index];
-            subtitle[field] = value;
+            if (!subtitle) return;
 
-            // Actualizar también los milisegundos
+            const previousState = {
+                startTime: subtitle.startTime,
+                endTime: subtitle.endTime,
+                startMs: subtitle.startMs,
+                endMs: subtitle.endMs
+            };
+
+            const nextState = { ...previousState };
+
             if (field === 'startTime') {
-                subtitle.startMs = SRTParser.timeToMs(value);
+                nextState.startTime = value;
+                nextState.startMs = SRTParser.timeToMs(value);
+                if (isNaN(nextState.startMs)) {
+                    throw new Error('Formato de tiempo inválido');
+                }
             } else if (field === 'endTime') {
-                subtitle.endMs = SRTParser.timeToMs(value);
+                nextState.endTime = value;
+                nextState.endMs = SRTParser.timeToMs(value);
+                if (isNaN(nextState.endMs)) {
+                    throw new Error('Formato de tiempo inválido');
+                }
+            } else {
+                return;
             }
 
+            if (previousState[field] === nextState[field]) {
+                return;
+            }
+
+            subtitle.startTime = nextState.startTime;
+            subtitle.endTime = nextState.endTime;
+            subtitle.startMs = nextState.startMs;
+            subtitle.endMs = nextState.endMs;
+
+            this.pushHistory({
+                type: 'update',
+                id: subtitle.id,
+                prev: previousState,
+                next: nextState
+            });
+
+            this.setSelectionById(subtitle.id);
+            this.sortSubtitles();
+            this.renderSubtitles();
             console.log(`Tiempo actualizado para subtítulo #${index + 1}`);
         } catch (error) {
             console.error('Error al actualizar tiempo:', error);
             alert('Formato de tiempo inválido. Usa HH:MM:SS,mmm');
+            this.renderSubtitles();
         }
     }
 
     // Actualizar texto de subtítulo
     updateSubtitleText(index, text) {
-        this.subtitles[index].text = text;
+        const subtitle = this.subtitles[index];
+        if (!subtitle) return;
+
+        const previousText = subtitle.text;
+        if (previousText === text) return;
+
+        subtitle.text = text;
+
+        this.pushHistory({
+            type: 'update',
+            id: subtitle.id,
+            prev: { text: previousText },
+            next: { text: text }
+        });
+
+        this.setSelectionById(subtitle.id);
     }
 
     // Actualizar subtítulo activo en el overlay
@@ -452,12 +708,13 @@ class SubtitleEditor {
 
     // Agregar nuevo subtítulo
     addNewSubtitle() {
+        const previousSelectionId = this.selectedSubtitleId;
         const currentMs = this.videoPlayer.currentTime * 1000;
         const startTime = SRTParser.msToTime(currentMs);
         const endTime = SRTParser.msToTime(currentMs + 2000); // 2 segundos de duración por defecto
 
         const newSubtitle = {
-            id: this.subtitles.length + 1,
+            id: this.generateSubtitleId(),
             startTime: startTime,
             endTime: endTime,
             startMs: currentMs,
@@ -466,9 +723,19 @@ class SubtitleEditor {
         };
 
         this.subtitles.push(newSubtitle);
-        this.subtitles.sort((a, b) => a.startMs - b.startMs);
-
+        this.sortSubtitles();
+        const newIndex = this.findSubtitleIndexById(newSubtitle.id);
+        this.setSelectionById(newSubtitle.id);
         this.renderSubtitles();
+        if (newIndex !== -1) {
+            this.selectSubtitle(newIndex);
+        }
+
+        this.pushHistory({
+            type: 'add',
+            subtitle: this.cloneSubtitle(newSubtitle),
+            previousSelectionId
+        });
         console.log('Nuevo subtítulo agregado');
     }
 
@@ -479,11 +746,15 @@ class SubtitleEditor {
             return;
         }
 
-        const index = this.subtitles.findIndex(s => s.id === this.selectedSubtitleId);
-        if (index !== -1) {
-            this.subtitles.splice(index, 1);
-            this.selectedSubtitleId = null;
-            this.currentSelectedIndex = -1;
+        const removed = this.removeSubtitleById(this.selectedSubtitleId);
+        if (removed) {
+            this.pushHistory({
+                type: 'delete',
+                subtitle: this.cloneSubtitle(removed),
+                previousSelectionId: this.selectedSubtitleId
+            });
+
+            this.setSelectionById(null);
             this.renderSubtitles();
             console.log('Subtítulo eliminado');
         }
