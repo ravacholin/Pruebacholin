@@ -203,6 +203,31 @@ header h1 {
     gap: 0.5rem;
 }
 
+.timeline-summary {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #3d3d3d;
+    background: #252525;
+    font-size: 0.85rem;
+    color: #a0a0a0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.25rem;
+}
+
+.timeline-summary.ok {
+    color: #22c55e;
+}
+
+.timeline-summary.warning {
+    color: #facc15;
+}
+
+.timeline-summary.error {
+    color: #f87171;
+}
+
 .subtitle-count {
     display: inline-block;
     background: #404040;
@@ -340,6 +365,16 @@ header h1 {
     background: #3a3a52;
 }
 
+.subtitle-item.timeline-error {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+}
+
+.subtitle-item.timeline-warning {
+    border-color: #facc15;
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2);
+}
+
 .subtitle-item.active {
     border-color: #16a34a;
     box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
@@ -398,6 +433,23 @@ header h1 {
 .time-input:focus {
     outline: none;
     border-color: #2563eb;
+}
+
+.timeline-alert {
+    display: none;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.subtitle-item.timeline-error .timeline-alert {
+    display: block;
+    color: #fca5a5;
+}
+
+.subtitle-item.timeline-warning .timeline-alert {
+    display: block;
+    color: #fde68a;
 }
 
 .subtitle-text {
