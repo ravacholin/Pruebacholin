@@ -93,17 +93,18 @@ header h1 {
 .main-content {
     display: flex;
     flex: 1;
-    overflow: hidden;
+    min-height: 0;
+    overflow: auto;
 }
 
 /* Video Section */
 .video-section {
-    flex: 1;
+    flex: 1 1 0%;
     display: flex;
     flex-direction: column;
     background: #252525;
-    border-right: 2px solid #3d3d3d;
     padding: 1rem;
+    min-width: 280px;
 }
 
 .video-container {
@@ -181,10 +182,56 @@ header h1 {
 
 /* Editor Section */
 .editor-section {
-    width: 450px;
+    flex: 0 0 450px;
     display: flex;
     flex-direction: column;
     background: #2d2d2d;
+    min-width: 320px;
+}
+
+.editor-section,
+.video-section {
+    transition: flex-basis 0.2s ease;
+}
+
+.divider {
+    width: 6px;
+    background: #1f1f1f;
+    border-left: 1px solid #3d3d3d;
+    border-right: 1px solid #3d3d3d;
+    cursor: col-resize;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    position: relative;
+    user-select: none;
+    flex: 0 0 auto;
+    align-self: stretch;
+}
+
+.divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 40px;
+    background: #2f2f2f;
+    border-radius: 2px;
+}
+
+.divider:hover,
+.divider.active {
+    background: #2d2d2d;
+    border-color: #4d4d4d;
+}
+
+body.resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
+body.resizing * {
+    cursor: col-resize !important;
 }
 
 .editor-header {
@@ -437,26 +484,33 @@ header h1 {
 }
 
 /* Responsive */
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
     .editor-section {
-        width: 400px;
+        flex-basis: 380px;
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .main-content {
         flex-direction: column;
+        overflow: auto;
     }
 
-    .video-section {
-        border-right: none;
-        border-bottom: 2px solid #3d3d3d;
-        height: 50%;
+    .divider {
+        display: none;
+    }
+
+    .video-section,
+    .editor-section {
+        flex: none;
+        width: 100%;
+        min-width: 0;
+        transition: none;
     }
 
     .editor-section {
-        width: 100%;
-        height: 50%;
+        flex-basis: auto;
+        margin-top: 1rem;
     }
 
     header {

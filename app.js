@@ -20,9 +20,19 @@ class SubtitleEditor {
         this.searchInput = document.getElementById('searchInput');
         this.clearSearchBtn = document.getElementById('clearSearch');
         this.searchResults = document.getElementById('searchResults');
+        this.mainContent = document.querySelector('.main-content');
+        this.videoSection = document.querySelector('.video-section');
+        this.editorSection = document.querySelector('.editor-section');
+        this.divider = document.getElementById('divider');
+        this.splitPaneMediaQuery = window.matchMedia('(max-width: 900px)');
+        this.splitPaneStorageKey = 'subtitleEditor.splitPane';
+        this.isDraggingDivider = false;
+        this.minVideoWidth = 280;
+        this.minEditorWidth = 320;
 
         this.initializeEventListeners();
         this.initializeKeyboardShortcuts();
+        this.initializeSplitPane();
     }
 
     initializeEventListeners() {
@@ -551,6 +561,167 @@ class SubtitleEditor {
         this.searchQuery = '';
         this.filterSubtitles();
         this.searchInput.blur();
+    }
+
+    initializeSplitPane() {
+        if (!this.mainContent || !this.videoSection || !this.editorSection || !this.divider) {
+            return;
+        }
+
+        const restoreSizes = () => {
+            this.divider.classList.remove('active');
+            document.body.classList.remove('resizing');
+            this.isDraggingDivider = false;
+
+            if (this.splitPaneMediaQuery.matches) {
+                this.resetSplitPaneStyles();
+                return;
+            }
+
+            this.restoreSplitPaneSizes();
+        };
+
+        const startDragging = (event) => {
+            if (this.splitPaneMediaQuery.matches) {
+                return;
+            }
+
+            this.isDraggingDivider = true;
+            this.divider.classList.add('active');
+            document.body.classList.add('resizing');
+            event.preventDefault();
+        };
+
+        const onMouseMove = (event) => {
+            if (!this.isDraggingDivider) {
+                return;
+            }
+
+            const containerRect = this.mainContent.getBoundingClientRect();
+            const availableWidth = containerRect.width;
+            if (availableWidth <= this.minVideoWidth + this.minEditorWidth) {
+                return;
+            }
+
+            let offset = event.clientX - containerRect.left;
+            const maxVideoWidth = availableWidth - this.minEditorWidth;
+            offset = Math.max(this.minVideoWidth, Math.min(offset, maxVideoWidth));
+
+            const videoWidth = offset;
+            const editorWidth = availableWidth - videoWidth;
+            this.applySplitPaneSizes(videoWidth, editorWidth);
+        };
+
+        const stopDragging = () => {
+            if (!this.isDraggingDivider) {
+                return;
+            }
+
+            this.isDraggingDivider = false;
+            this.divider.classList.remove('active');
+            document.body.classList.remove('resizing');
+
+            const videoBasis = parseFloat(this.videoSection.style.flexBasis);
+            const editorBasis = parseFloat(this.editorSection.style.flexBasis);
+
+            if (Number.isNaN(videoBasis) || Number.isNaN(editorBasis)) {
+                return;
+            }
+
+            try {
+                localStorage.setItem(
+                    this.splitPaneStorageKey,
+                    JSON.stringify({ videoWidth: videoBasis, editorWidth: editorBasis })
+                );
+            } catch (error) {
+                console.warn('No se pudo guardar el tamaño del panel:', error);
+            }
+        };
+
+        this.divider.addEventListener('mousedown', startDragging);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', stopDragging);
+
+        if (this.splitPaneMediaQuery.addEventListener) {
+            this.splitPaneMediaQuery.addEventListener('change', restoreSizes);
+        } else if (this.splitPaneMediaQuery.addListener) {
+            this.splitPaneMediaQuery.addListener(restoreSizes);
+        }
+
+        window.addEventListener('resize', restoreSizes);
+
+        restoreSizes();
+    }
+
+    applySplitPaneSizes(videoWidth, editorWidth) {
+        const safeVideoWidth = Math.max(0, videoWidth);
+        const safeEditorWidth = Math.max(0, editorWidth);
+
+        this.videoSection.style.flexBasis = `${safeVideoWidth}px`;
+        this.videoSection.style.width = `${safeVideoWidth}px`;
+        this.editorSection.style.flexBasis = `${safeEditorWidth}px`;
+        this.editorSection.style.width = `${safeEditorWidth}px`;
+    }
+
+    resetSplitPaneStyles() {
+        this.videoSection.style.flexBasis = '';
+        this.videoSection.style.width = '';
+        this.editorSection.style.flexBasis = '';
+        this.editorSection.style.width = '';
+    }
+
+    restoreSplitPaneSizes() {
+        if (!this.mainContent) {
+            return;
+        }
+
+        const containerWidth = this.mainContent.getBoundingClientRect().width;
+        if (!containerWidth) {
+            requestAnimationFrame(() => this.restoreSplitPaneSizes());
+            return;
+        }
+
+        const minTotal = this.minVideoWidth + this.minEditorWidth;
+        const availableWidth = containerWidth;
+        const usableWidth = availableWidth > 0
+            ? Math.max(availableWidth, minTotal)
+            : minTotal;
+
+        let savedSizes = null;
+        try {
+            savedSizes = JSON.parse(localStorage.getItem(this.splitPaneStorageKey));
+        } catch (error) {
+            console.warn('No se pudo leer el tamaño del panel almacenado:', error);
+        }
+
+        let videoWidth;
+        let editorWidth;
+
+        if (savedSizes && typeof savedSizes.videoWidth === 'number' && typeof savedSizes.editorWidth === 'number') {
+            const maxVideoWidth = usableWidth - this.minEditorWidth;
+            const maxEditorWidth = usableWidth - this.minVideoWidth;
+
+            videoWidth = Math.min(Math.max(savedSizes.videoWidth, this.minVideoWidth), maxVideoWidth);
+            editorWidth = Math.min(Math.max(savedSizes.editorWidth, this.minEditorWidth), maxEditorWidth);
+        } else {
+            editorWidth = Math.min(Math.max(450, this.minEditorWidth), usableWidth - this.minVideoWidth);
+            videoWidth = usableWidth - editorWidth;
+        }
+
+        if (availableWidth > 0 && usableWidth !== availableWidth) {
+            const scale = availableWidth / usableWidth;
+            videoWidth *= scale;
+            editorWidth = availableWidth - videoWidth;
+        } else if (availableWidth > 0) {
+            const total = videoWidth + editorWidth;
+            if (total !== availableWidth) {
+                const scale = availableWidth / total;
+                videoWidth *= scale;
+                editorWidth = availableWidth - videoWidth;
+            }
+        }
+
+        this.applySplitPaneSizes(videoWidth, editorWidth);
     }
 }
 
