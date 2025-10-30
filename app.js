@@ -9,6 +9,9 @@ class SubtitleEditor {
         this.searchQuery = '';
         this.filteredSubtitles = [];
         this.autoScrollEnabled = true;
+        this.matchIndices = [];
+        this.activeMatchIndex = -1;
+        this.keepOnlyMatches = false;
 
         // Elementos del DOM
         this.videoPlayer = document.getElementById('videoPlayer');
@@ -20,6 +23,9 @@ class SubtitleEditor {
         this.searchInput = document.getElementById('searchInput');
         this.clearSearchBtn = document.getElementById('clearSearch');
         this.searchResults = document.getElementById('searchResults');
+        this.prevMatchBtn = document.getElementById('prevMatch');
+        this.nextMatchBtn = document.getElementById('nextMatch');
+        this.keepMatchesSwitch = document.getElementById('keepMatchesSwitch');
 
         this.initializeEventListeners();
         this.initializeKeyboardShortcuts();
@@ -95,6 +101,19 @@ class SubtitleEditor {
 
         this.clearSearchBtn.addEventListener('click', () => {
             this.clearSearch();
+        });
+
+        this.nextMatchBtn.addEventListener('click', () => {
+            this.focusNextMatch();
+        });
+
+        this.prevMatchBtn.addEventListener('click', () => {
+            this.focusPrevMatch();
+        });
+
+        this.keepMatchesSwitch.addEventListener('change', (e) => {
+            this.keepOnlyMatches = e.target.checked;
+            this.filterSubtitles();
         });
     }
 
@@ -238,7 +257,10 @@ class SubtitleEditor {
                     <input type="text" class="time-input" data-field="endTime" value="${subtitle.endTime}">
                 </div>
             </div>
-            <textarea class="subtitle-text" rows="2">${subtitle.text}</textarea>
+            <div class="subtitle-text-wrapper">
+                <div class="subtitle-text-overlay" aria-hidden="true"></div>
+                <textarea class="subtitle-text" rows="2">${subtitle.text}</textarea>
+            </div>
         `;
 
         // Click en el item para saltar al video
@@ -266,12 +288,21 @@ class SubtitleEditor {
 
         // Edición de texto
         const textarea = item.querySelector('.subtitle-text');
+        const overlay = item.querySelector('.subtitle-text-overlay');
+        this.updateSubtitleOverlay(item, subtitle.text);
+
         textarea.addEventListener('input', (e) => {
             this.updateSubtitleText(index, e.target.value);
         });
 
         textarea.addEventListener('click', (e) => {
             e.stopPropagation();
+        });
+
+        textarea.addEventListener('scroll', () => {
+            if (overlay) {
+                this.syncOverlayScroll(textarea, overlay);
+            }
         });
 
         return item;
@@ -291,6 +322,17 @@ class SubtitleEditor {
             item.classList.add('selected');
             this.selectedSubtitleId = this.subtitles[index].id;
             this.currentSelectedIndex = index;
+
+            if (this.matchIndices.length > 0) {
+                const matchPosition = this.matchIndices.indexOf(index);
+                if (matchPosition !== -1) {
+                    this.activeMatchIndex = matchPosition;
+                    this.updateSearchStatus();
+                } else if (this.activeMatchIndex !== -1) {
+                    this.activeMatchIndex = -1;
+                    this.updateSearchStatus();
+                }
+            }
 
             // Scroll al elemento seleccionado
             if (scrollToView) {
@@ -382,6 +424,10 @@ class SubtitleEditor {
     // Actualizar texto de subtítulo
     updateSubtitleText(index, text) {
         this.subtitles[index].text = text;
+        const item = this.subtitleList.querySelector(`[data-index="${index}"]`);
+        if (item) {
+            this.updateSubtitleOverlay(item, text);
+        }
     }
 
     // Actualizar subtítulo activo en el overlay
@@ -492,18 +538,22 @@ class SubtitleEditor {
     // Filtrar subtítulos por búsqueda
     filterSubtitles() {
         const query = this.searchQuery.toLowerCase().trim();
+        const items = this.subtitleList.querySelectorAll('.subtitle-item');
+        this.matchIndices = [];
+        this.activeMatchIndex = -1;
 
         if (!query) {
             // Mostrar todos los subtítulos
-            const items = this.subtitleList.querySelectorAll('.subtitle-item');
             items.forEach(item => {
                 item.classList.remove('hidden', 'search-match');
                 // Restaurar texto sin highlights
                 const textarea = item.querySelector('.subtitle-text');
                 const index = parseInt(item.dataset.index);
-                if (textarea && this.subtitles[index]) {
-                    textarea.value = this.subtitles[index].text;
+                const subtitle = this.subtitles[index];
+                if (textarea && subtitle) {
+                    textarea.value = subtitle.text;
                 }
+                this.updateSubtitleOverlay(item, subtitle ? subtitle.text : '', '');
             });
             this.clearSearchBtn.classList.remove('visible');
             this.searchResults.textContent = '';
@@ -513,11 +563,16 @@ class SubtitleEditor {
         this.clearSearchBtn.classList.add('visible');
 
         let matchCount = 0;
-        const items = this.subtitleList.querySelectorAll('.subtitle-item');
 
         items.forEach(item => {
             const index = parseInt(item.dataset.index);
             const subtitle = this.subtitles[index];
+            if (!subtitle) {
+                item.classList.remove('search-match');
+                item.classList.remove('hidden');
+                this.updateSubtitleOverlay(item, '', '');
+                return;
+            }
             const text = subtitle.text.toLowerCase();
 
             if (text.includes(query)) {
@@ -525,6 +580,7 @@ class SubtitleEditor {
                 item.classList.remove('hidden');
                 item.classList.add('search-match');
                 matchCount++;
+                this.matchIndices.push(index);
 
                 // Highlight del texto coincidente en el textarea
                 const textarea = item.querySelector('.subtitle-text');
@@ -532,17 +588,33 @@ class SubtitleEditor {
                     // Para textareas no podemos usar HTML, así que solo restauramos el texto
                     textarea.value = subtitle.text;
                 }
+                this.updateSubtitleOverlay(item, subtitle.text, query);
             } else {
                 // Ocultar
-                item.classList.add('hidden');
+                if (this.keepOnlyMatches) {
+                    item.classList.add('hidden');
+                } else {
+                    item.classList.remove('hidden');
+                }
                 item.classList.remove('search-match');
+                this.updateSubtitleOverlay(item, subtitle.text, '');
             }
         });
 
-        // Mostrar resultados
-        this.searchResults.textContent = matchCount > 0
-            ? `${matchCount} resultado${matchCount !== 1 ? 's' : ''} encontrado${matchCount !== 1 ? 's' : ''}`
-            : 'No se encontraron resultados';
+        if (matchCount > 0) {
+            const currentMatchPosition = this.matchIndices.indexOf(this.currentSelectedIndex);
+            if (currentMatchPosition !== -1) {
+                this.activeMatchIndex = currentMatchPosition;
+            } else {
+                this.activeMatchIndex = 0;
+                const firstMatchIndex = this.matchIndices[0];
+                if (typeof firstMatchIndex === 'number') {
+                    this.selectSubtitle(firstMatchIndex, false);
+                }
+            }
+        }
+
+        this.updateSearchStatus(matchCount);
     }
 
     // Limpiar búsqueda
@@ -551,6 +623,110 @@ class SubtitleEditor {
         this.searchQuery = '';
         this.filterSubtitles();
         this.searchInput.blur();
+    }
+
+    focusNextMatch() {
+        if (this.matchIndices.length === 0) return;
+
+        if (this.activeMatchIndex === -1) {
+            this.activeMatchIndex = 0;
+        } else {
+            this.activeMatchIndex = (this.activeMatchIndex + 1) % this.matchIndices.length;
+        }
+
+        const subtitleIndex = this.matchIndices[this.activeMatchIndex];
+        this.selectSubtitle(subtitleIndex);
+        this.updateSearchStatus();
+    }
+
+    focusPrevMatch() {
+        if (this.matchIndices.length === 0) return;
+
+        if (this.activeMatchIndex === -1) {
+            this.activeMatchIndex = this.matchIndices.length - 1;
+        } else {
+            this.activeMatchIndex = (this.activeMatchIndex - 1 + this.matchIndices.length) % this.matchIndices.length;
+        }
+
+        const subtitleIndex = this.matchIndices[this.activeMatchIndex];
+        this.selectSubtitle(subtitleIndex);
+        this.updateSearchStatus();
+    }
+
+    updateSearchStatus(matchCount = this.matchIndices.length) {
+        if (!this.searchQuery.trim()) {
+            this.searchResults.textContent = '';
+            return;
+        }
+
+        if (matchCount === 0) {
+            this.searchResults.textContent = 'No se encontraron resultados';
+            return;
+        }
+
+        if (this.activeMatchIndex >= 0) {
+            const current = this.activeMatchIndex + 1;
+            this.searchResults.textContent = `${matchCount} resultado${matchCount !== 1 ? 's' : ''} • ${current} de ${matchCount}`;
+        } else {
+            this.searchResults.textContent = `${matchCount} resultado${matchCount !== 1 ? 's' : ''} • sin selección`;
+        }
+    }
+
+    syncOverlayScroll(textarea, overlay) {
+        if (!textarea || !overlay) return;
+        overlay.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
+    }
+
+    updateSubtitleOverlay(item, text, query = this.searchQuery) {
+        const overlay = item.querySelector('.subtitle-text-overlay');
+        if (!overlay) return;
+
+        if (typeof text !== 'string') {
+            text = '';
+        }
+
+        if (!query) {
+            overlay.innerHTML = this.escapeHtml(text);
+            const textarea = item.querySelector('.subtitle-text');
+            if (textarea) {
+                this.syncOverlayScroll(textarea, overlay);
+            } else {
+                overlay.style.transform = 'translate(0, 0)';
+            }
+            return;
+        }
+
+        const regex = new RegExp(`(${this.escapeRegExp(query)})`, 'gi');
+        const parts = text.split(regex);
+        const highlighted = parts.map(part => {
+            if (part.toLowerCase() === query.toLowerCase()) {
+                return `<mark>${this.escapeHtml(part)}</mark>`;
+            }
+            return this.escapeHtml(part);
+        }).join('');
+
+        overlay.innerHTML = highlighted;
+        const textarea = item.querySelector('.subtitle-text');
+        if (textarea) {
+            this.syncOverlayScroll(textarea, overlay);
+        } else {
+            overlay.style.transform = 'translate(0, 0)';
+        }
+    }
+
+    escapeHtml(text) {
+        const normalized = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        return normalized
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/\n/g, '<br>');
+    }
+
+    escapeRegExp(text) {
+        return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 }
 

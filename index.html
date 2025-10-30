@@ -63,14 +63,26 @@
 
                 <!-- Search Bar -->
                 <div class="search-container">
-                    <input
-                        type="text"
-                        id="searchInput"
-                        class="search-input"
-                        placeholder="Buscar en subtítulos... (Ctrl+F)"
-                        autocomplete="off"
-                    >
-                    <button id="clearSearch" class="btn-clear" title="Limpiar búsqueda">✕</button>
+                    <div class="search-input-wrapper">
+                        <input
+                            type="text"
+                            id="searchInput"
+                            class="search-input"
+                            placeholder="Buscar en subtítulos... (Ctrl+F)"
+                            autocomplete="off"
+                        >
+                        <button id="clearSearch" class="btn-clear" title="Limpiar búsqueda">✕</button>
+                    </div>
+                    <div class="search-actions">
+                        <div class="search-navigation">
+                            <button id="prevMatch" class="btn-search" type="button">⟨ Anterior</button>
+                            <button id="nextMatch" class="btn-search" type="button">Siguiente ⟩</button>
+                        </div>
+                        <label class="keep-matches-toggle">
+                            <input type="checkbox" id="keepMatchesSwitch">
+                            <span>Mantener solo coincidencias</span>
+                        </label>
+                    </div>
                     <div id="searchResults" class="search-results"></div>
                 </div>
 
